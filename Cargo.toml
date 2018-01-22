@@ -1,0 +1,7 @@
+[package]
+name = "rustfish"
+version = "0.1.0"
+authors = ["Syzygy"]
+
+[dependencies]
+memmap = "0.6.2"
