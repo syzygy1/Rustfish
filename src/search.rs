@@ -154,16 +154,12 @@ const SKIP_SIZE: [i32; 20] =
 const SKIP_PHASE: [i32; 20] =
     [ 0, 1, 0, 1, 2, 3, 0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5, 6, 7 ];
 
-// Razoring and futility margin based on depth
-// razor_margin[0] is unused as long as depth >= ONE_PLY in search
-const RAZOR_MARGIN: [i32; 4] = [ 0, 570, 603, 554 ];
-
 fn futility_margin(d: Depth) -> Value {
     Value(150 * d / ONE_PLY)
 }
 
-fn razor_margin(d: Depth) -> Value {
-    Value(RAZOR_MARGIN[(d / ONE_PLY) as usize])
+fn razor_margin() -> Value {
+    Value(600)
 }
 
 // Futility and reductions lookup tables, initialized at startup
@@ -280,10 +276,21 @@ pub fn mainthread_search(pos: &mut Position, th: &threads::ThreadCtrl) {
     pos.previous_score = Value::INFINITE;
     pos.previous_time_reduction = 1.0;
 
-    let contempt = ucioption::get_i32("Contempt") * PawnValueEg / 100;
+    let analyzing = limits().infinite || ucioption::get_bool("UCI_Analysis");
+
+    // When analyzing, use contempt only if the user has said so
+    let contempt =
+        if !analyzing || ucioption::get_bool("Analysis Contempt") {
+            ucioption::get_i32("Contempt") * PawnValueEg / 100
+        } else {
+            Value::ZERO
+        };
+
     let contempt = Score::make(contempt.0, contempt.0 / 2);
+
     unsafe {
-        evaluate::CONTEMPT = if us == WHITE { contempt } else { -contempt};
+        evaluate::CONTEMPT = if analyzing || us == WHITE { contempt }
+            else { -contempt };
     }
 
     if pos.root_moves.is_empty() {
@@ -852,14 +859,14 @@ fn search(
         // Step 6. Razoring (skipped when in check)
         if !pv_node
             && depth < 4 * ONE_PLY
-            && eval + razor_margin(depth) <= alpha
+            && eval + razor_margin() <= alpha
         {
             if depth <= ONE_PLY {
                 return qsearch(pos, ss, alpha, alpha+1, Depth::ZERO, NonPv,
                     false);
             }
 
-            let ralpha = alpha - razor_margin(depth);
+            let ralpha = alpha - razor_margin();
             let v = qsearch(pos, ss, ralpha, ralpha+1, Depth::ZERO, NonPv,
                 false);
             if v <= ralpha {
@@ -1584,7 +1591,6 @@ fn qsearch(
             && !pos.capture(m);
 
         if (!in_check || evasion_prunable)
-            && m.move_type() != PROMOTION
             && !pos.see_ge(m, Value::ZERO)
         {
             continue;

@@ -94,7 +94,7 @@ static mut OPTIONS: *mut Vec<Opt> = 0 as *mut Vec<Opt>;
 pub fn init()
 {
     let mut opts = Box::new(Vec::new());
-    opts.push(Opt::new("Contempt", OptVal::spin(0, -100, 100), None));
+    opts.push(Opt::new("Contempt", OptVal::spin(20, -100, 100), None));
     opts.push(Opt::new("Analysis Contempt", OptVal::check(false), None));
     opts.push(Opt::new("Threads", OptVal::spin(1, 1, 512), Some(on_threads)));
     opts.push(Opt::new("Hash", OptVal::spin(16, 1, 128 * 1024),
