@@ -2856,7 +2856,7 @@ fn decompress_pairs(d: &PairsData, idx: usize) -> u32 {
         block -= 1;
         lit_idx += d.size_table[block] as isize + 1;
     }
-    while lit_idx > d.size_table[block] as isize + 1 {
+    while lit_idx > d.size_table[block] as isize {
         lit_idx -= d.size_table[block] as isize + 1;
         block += 1;
     }

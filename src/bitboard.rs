@@ -60,13 +60,13 @@ struct Magics {
 static mut ROOK_MAGICS: Magics = Magics {
     masks: [Bitboard(0); 64],
     magics: [0; 64],
-    attacks: unsafe { [&ATTACKS_TABLE; 64] },
+    attacks: [&[]; 64],
 };
 
 static mut BISHOP_MAGICS: Magics = Magics {
     masks: [Bitboard(0); 64],
     magics: [0; 64],
-    attacks: unsafe { [&ATTACKS_TABLE; 64] },
+    attacks: [&[]; 64],
 };
 
 static mut ATTACKS_TABLE: [Bitboard; 88772] = [Bitboard(0); 88772];
