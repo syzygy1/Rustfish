@@ -29,10 +29,6 @@ impl Prng {
         (*self).0 ^= (*self).0 >> 27;
         u64::wrapping_mul(self.0, 2685821657736338717)
     }
-
-    pub fn sparse_rand(&mut self) -> u64 {
-        self.rand64() & self.rand64() & self.rand64()
-    }
 }
 
 pub fn engine_info(to_uci: bool) -> String {
