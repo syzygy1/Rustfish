@@ -707,37 +707,33 @@ fn set_norm_pawn(ei: &mut EncInfo, e: &PawnEntry) {
 }
 
 fn setup_pieces_piece(
-    ei: &mut EncInfo, e: &PieceEntry, data: *const u8, s: u32
+    ei: &mut EncInfo, e: &PieceEntry, tb: &[u8], s: u32
 ) -> usize {
     let order;
 
-    unsafe {
-        for i in 0..(e.num as usize) {
-            ei.pieces[i] = (*data.offset(i as isize + 1) >> s) & 0x0f;
-        }
-        order = (*data >> s) & 0x0f;
+    for i in 0..(e.num as usize) {
+        ei.pieces[i] = (tb[i + 1] >> s) & 0x0f;
     }
+    order = (tb[0] >> s) & 0x0f;
 
     set_norm_piece(ei, e);
     calc_factors_piece(ei, e, order)
 }
 
 fn setup_pieces_pawn(
-    ei: &mut EncInfo, e: &PawnEntry, data: *const u8, s: u32, t: usize,
+    ei: &mut EncInfo, e: &PawnEntry, tb: &[u8], s: u32, t: usize,
     by_file: bool
 ) -> usize {
-    let j = 1 + (e.pawns[1] > 0) as isize;
+    let j = 1 + (e.pawns[1] > 0) as usize;
     let order;
     let order2;
 
-    unsafe {
-        for i in 0..(e.num as usize) {
-            ei.pieces[i] = (*data.offset(i as isize + j) >> s) & 0x0f;
-        }
-        order = (*data >> s) & 0x0f;
-        order2 =
-            if e.pawns[1] > 0 { (*data.offset(1) >> s) & 0x0f } else { 0x0f };
+    for i in 0..(e.num as usize) {
+        ei.pieces[i] = (tb[i + j] >> s) & 0x0f;
     }
+    order = (tb[0] >> s) & 0x0f;
+    order2 =
+        if e.pawns[1] > 0 { (tb[1] >> s) & 0x0f } else { 0x0f };
 
     set_norm_pawn(ei, e);
     calc_factors_pawn(ei, e, order, order2, t, by_file)
@@ -792,13 +788,13 @@ fn calc_sym_len(
 }
 
 fn setup_pairs(
-    ptr: &mut *const u8, tb_size: usize, size: &mut [usize], flags: &mut u8,
-    is_wdl: bool
+    data_ref: &mut &'static [u8], tb_size: usize, size: &mut [usize],
+    flags: &mut u8, is_wdl: bool
 ) -> Box<PairsData> {
-    let data = *ptr;
-    *flags = unsafe { *data };
+    let data = *data_ref;
+    *flags = data[0];
     if *flags & 0x80 != 0 {
-        *ptr = unsafe { data.offset(2) };
+        *data_ref = &data[2..];
         return Box::new(PairsData {
             index_table: &[],
             size_table: &[],
@@ -809,30 +805,24 @@ fn setup_pairs(
             block_size: 0,
             idx_bits: 0,
             min_len: 0,
-            const_val:
-                if is_wdl { unsafe { *data.offset(1) as u16 } } else { 0 },
+            const_val: if is_wdl { data[1] as u16 } else { 0 },
             base: Vec::new(),
         });
     }
 
-    let block_size = unsafe { *data.offset(1) } as u32;
-    let idx_bits = unsafe { *data.offset(2) } as u32;
-    let real_num_blocks = u32::from_le(
-        unsafe { *(data.offset(4) as *const u32) });
-    let num_blocks = real_num_blocks + unsafe { *data.offset(3) } as u32;
-    let max_len = unsafe { *data.offset(8) };
-    let min_len = unsafe { *data.offset(9) };
+    let block_size = data[1] as u32;
+    let idx_bits = data[2] as u32;
+    let real_num_blocks = u32::from_le(cast_slice(&data[4..], 1)[0]);
+    let num_blocks = real_num_blocks + data[3] as u32;
+    let max_len = data[8];
+    let min_len = data[9];
     let h = (max_len - min_len + 1) as usize;
-    let num_syms = u16::from_le(
-        unsafe { *(data.offset(10 + 2 * h as isize) as *const u16) }) as usize;
+    let num_syms = u16::from_le(cast_slice(&data[10 + 2 * h..], 1)[0]) as usize;
     let mut sym_len = Vec::with_capacity(num_syms);
     for _ in 0..num_syms {
         sym_len.push(0u8);
     }
-    let sym_pat = unsafe {
-        slice::from_raw_parts(
-            data.offset(12 + 2 * h as isize) as *const [u8; 3], num_syms)
-    };
+    let sym_pat = cast_slice::<[u8; 3]>(&data[12 + 2 * h..], num_syms);
 
     let mut tmp = Vec::with_capacity(num_syms);
     for _ in 0..num_syms {
@@ -847,11 +837,9 @@ fn setup_pairs(
     size[1] = num_blocks as usize;
     size[2] = (real_num_blocks as usize) << block_size;
 
-    *ptr = unsafe { data.offset(12 + 2 * h as isize + 3 * num_syms as isize
-        + (num_syms & 1) as isize) };
+    *data_ref = &data[12 + 2 * h + 3 * num_syms + (num_syms & 1)..];
 
-    let offset =
-        unsafe { slice::from_raw_parts(data.offset(10) as *const u16, h) };
+    let offset = cast_slice::<u16>(&data[10..], h);
     let mut base = Vec::with_capacity(h);
     for _ in 0..h {
         base.push(0u64);
@@ -880,40 +868,62 @@ fn setup_pairs(
     })
 }
 
-fn align_ptr(ptr: *const u8, align: usize) -> *const u8 {
-    ((ptr as usize + align - 1) & !(align - 1)) as *const u8
+fn align_slice(data: &[u8], align: usize) -> &[u8] {
+    let ptr1 = data.as_ptr() as usize;
+    let ptr2 = (ptr1 + align - 1) & !(align - 1);
+    &data[(ptr2 - ptr1)..]
 }
 
-fn slice<T>(ptr: &mut *const u8, size: usize) -> &'static [T] {
+fn slice<'a, T>(data: &mut &'a [u8], size: usize) -> &'a [T] {
+    let ptr = data.as_ptr();
+    *data = &data[size * std::mem::size_of::<T>()..];
     unsafe {
-        let base = *ptr as *const T;
-        *ptr = base.offset(size as isize) as *const u8;
-        slice::from_raw_parts(base, size)
+        slice::from_raw_parts(ptr as *const T, size)
+    }
+}
+
+fn cast_slice<T>(data: &[u8], size: usize) -> &[T] {
+    assert!(data.len() >= size * std::mem::size_of::<T>());
+
+    unsafe {
+        slice::from_raw_parts(data.as_ptr() as *const T, size)
+    }
+}
+
+fn read_magic(mmap: &Option<Box<Mmap>>) -> u32 {
+    let data: &[u8] = &*mmap.as_ref().unwrap();
+    u32::from_le(cast_slice(data, 1)[0])
+}
+
+fn mmap_to_slice(mmap: &Option<Box<Mmap>>) -> &'static [u8] {
+    let data: &[u8] = &*mmap.as_ref().unwrap();
+    unsafe {
+        slice::from_raw_parts(data.as_ptr(), data.len())
     }
 }
 
 fn init_table_piece_wdl(
     e: &PieceEntry, wdl: &mut WdlPiece, name: &str
 ) -> bool {
-    wdl.mapping = map_file(name, WDL_SUFFIX);
-    if wdl.mapping.is_none() {
+    let tb_map = map_file(name, WDL_SUFFIX);
+    if tb_map.is_none() {
         return false;
     }
 
-    let mut data = wdl.mapping.as_ref().unwrap().as_ptr();
-
-    if u32::from_le(unsafe { *(data as *const u32) }) != WDL_MAGIC {
+    if read_magic(&tb_map) != WDL_MAGIC {
         eprintln!("Corrupted table: {}{}", name, WDL_SUFFIX);
-        wdl.mapping = None;
         return false;
     }
 
-    let split = unsafe { *data.offset(4) } & 0x01 != 0;
-    data = unsafe { data.offset(5) };
+    wdl.mapping = tb_map;
+    let mut data = mmap_to_slice(&wdl.mapping);
+
+    let split = data[4] & 0x01 != 0;
+    data = &data[5..];
     let tb_size_0 = setup_pieces_piece(&mut wdl.ei[0], e, data, 0);
     let tb_size_1 = setup_pieces_piece(&mut wdl.ei[1], e, data, 4);
-    data = unsafe { data.offset(e.num as isize + 1) };
-    data = align_ptr(data, 2);
+    data = &data[(e.num as usize + 1)..];
+    data = align_slice(data, 2);
 
     let mut size = [0; 6];
     let mut flags = 0u8;
@@ -936,10 +946,10 @@ fn init_table_piece_wdl(
             slice(&mut data, size[4]);
     }
 
-    data = align_ptr(data, 64);
+    data = align_slice(data, 64);
     wdl.ei[0].precomp.as_mut().unwrap().data = slice(&mut data, size[2]);
     if split {
-        data = align_ptr(data, 64);
+        data = align_slice(data, 64);
         wdl.ei[1].precomp.as_mut().unwrap().data = slice(&mut data, size[5]);
     }
 
@@ -947,21 +957,21 @@ fn init_table_piece_wdl(
 }
 
 fn init_table_pawn_wdl(e: &PawnEntry, wdl: &mut WdlPawn, name: &str) -> bool {
-    wdl.mapping = map_file(name, WDL_SUFFIX);
-    if wdl.mapping.is_none() {
+    let tb_map = map_file(name, WDL_SUFFIX);
+    if tb_map.is_none() {
         return false;
     }
 
-    let mut data = wdl.mapping.as_ref().unwrap().as_ptr();
-
-    if u32::from_le(unsafe { *(data as *const u32) }) != WDL_MAGIC {
+    if read_magic(&tb_map) != WDL_MAGIC {
         eprintln!("Corrupted table: {}{}", name, WDL_SUFFIX);
-        wdl.mapping = None;
         return false;
     }
 
-    let split = unsafe { *data.offset(4) } & 0x01 != 0;
-    data = unsafe { data.offset(5) };
+    wdl.mapping = tb_map;
+    let mut data = mmap_to_slice(&wdl.mapping);
+
+    let split = data[4] & 0x01 != 0;
+    data = &data[5..];
 
     let mut tb_size = [[0; 2]; 4];
     for f in 0..4 {
@@ -969,10 +979,9 @@ fn init_table_pawn_wdl(e: &PawnEntry, wdl: &mut WdlPawn, name: &str) -> bool {
             setup_pieces_pawn(&mut wdl.ei[f][0], e, data, 0, f, true);
         tb_size[f][1] =
             setup_pieces_pawn(&mut wdl.ei[f][1], e, data, 4, f, true);
-        data = unsafe {
-            data.offset(e.num as isize + 1 + (e.pawns[1] > 0) as isize) };
+        data = &data[e.num as usize + 1 + (e.pawns[1] > 0) as usize..];
     }
-    data = align_ptr(data, 2);
+    data = align_slice(data, 2);
 
     let mut size = [[0; 6]; 4];
     let mut flags = 0;
@@ -1004,11 +1013,11 @@ fn init_table_pawn_wdl(e: &PawnEntry, wdl: &mut WdlPawn, name: &str) -> bool {
     }
 
     for f in 0..4 {
-        data = align_ptr(data, 64);
+        data = align_slice(data, 64);
         wdl.ei[f][0].precomp.as_mut().unwrap().data =
             slice(&mut data, size[f][2]);
         if split {
-            data = align_ptr(data, 64);
+            data = align_slice(data, 64);
             wdl.ei[f][1].precomp.as_mut().unwrap().data =
                 slice(&mut data, size[f][5]);
         }
@@ -1020,27 +1029,27 @@ fn init_table_pawn_wdl(e: &PawnEntry, wdl: &mut WdlPawn, name: &str) -> bool {
 fn init_table_piece_dtm(
     e: &PieceEntry, dtm: &mut DtmPiece, name: &str
 ) -> bool {
-    dtm.mapping = map_file(name, DTM_SUFFIX);
-    if dtm.mapping.is_none() {
+    let tb_map = map_file(name, DTM_SUFFIX);
+    if tb_map.is_none() {
         return false;
     }
 
-    let mut data = dtm.mapping.as_ref().unwrap().as_ptr();
-
-    if u32::from_le(unsafe { *(data as *const u32) }) != DTM_MAGIC {
+    if read_magic(&tb_map) != DTM_MAGIC {
         eprintln!("Corrupted table: {}{}", name, DTM_SUFFIX);
-        dtm.mapping = None;
         return false;
     }
 
-    let split = unsafe { *data.offset(4) } & 0x01 != 0;
-    dtm.loss_only = unsafe { *data.offset(4) } & 0x04 != 0;
+    dtm.mapping = tb_map;
+    let mut data = mmap_to_slice(&dtm.mapping);
 
-    data = unsafe { data.offset(5) };
+    let split = data[4] & 0x01 != 0;
+    dtm.loss_only = data[4] & 0x04 != 0;
+
+    data = &data[5..];
     let tb_size_0 = setup_pieces_piece(&mut dtm.ei[0], e, data, 0);
     let tb_size_1 = setup_pieces_piece(&mut dtm.ei[1], e, data, 4);
-    data = unsafe { data.offset(e.num as isize + 1) };
-    data = align_ptr(data, 2);
+    data = &data[e.num as usize + 1..];
+    data = align_slice(data, 2);
 
     let mut size = [0; 6];
     let mut flags = 0u8;
@@ -1052,17 +1061,16 @@ fn init_table_piece_dtm(
     }
 
     if !dtm.loss_only {
-        let map = data as *const u16;
+        let map = cast_slice(data, data.len() / 2);
         let mut idx = 0;
         for i in 0..2 {
             dtm.map_idx[0][i] = 1 + idx;
-            idx += 1 + u16::from_le(unsafe { *map.offset(idx as isize) });
+            idx += 1 + u16::from_le(map[idx as usize]);
         }
         if split {
             for i in 0..2 {
                 dtm.map_idx[1][i] = 1 + idx;
-                idx += 1
-                    + u16::from_le(unsafe { *map.offset(idx as isize) });
+                idx += 1 + u16::from_le(map[idx as usize]);
             }
         }
         dtm.map = slice(&mut data, idx as usize);
@@ -1080,10 +1088,10 @@ fn init_table_piece_dtm(
             slice(&mut data, size[4]);
     }
 
-    data = align_ptr(data, 64);
+    data = align_slice(data, 64);
     dtm.ei[0].precomp.as_mut().unwrap().data = slice(&mut data, size[2]);
     if split {
-        data = align_ptr(data, 64);
+        data = align_slice(data, 64);
         dtm.ei[1].precomp.as_mut().unwrap().data = slice(&mut data, size[5]);
     }
 
@@ -1091,22 +1099,22 @@ fn init_table_piece_dtm(
 }
 
 fn init_table_pawn_dtm(e: &PawnEntry, dtm: &mut DtmPawn, name: &str) -> bool {
-    dtm.mapping = map_file(name, DTM_SUFFIX);
-    if dtm.mapping.is_none() {
+    let tb_map = map_file(name, DTM_SUFFIX);
+    if tb_map.is_none() {
         return false;
     }
 
-    let mut data = dtm.mapping.as_ref().unwrap().as_ptr();
-
-    if u32::from_le(unsafe { *(data as *const u32) }) != DTM_MAGIC {
+    if read_magic(&tb_map) != DTM_MAGIC {
         eprintln!("Corrupted table: {}{}", name, DTM_SUFFIX);
-        dtm.mapping = None;
         return false;
     }
 
-    let split = unsafe { *data.offset(4) } & 0x01 != 0;
-    dtm.loss_only = unsafe { *data.offset(4) } & 0x04 != 0;
-    data = unsafe { data.offset(5) };
+    dtm.mapping = tb_map;
+    let mut data = mmap_to_slice(&dtm.mapping);
+
+    let split = data[4] & 0x01 != 0;
+    dtm.loss_only = data[4] & 0x04 != 0;
+    data = &data[5..];
 
     let mut tb_size = [[0; 2]; 6];
     for r in 0..6 {
@@ -1114,10 +1122,9 @@ fn init_table_pawn_dtm(e: &PawnEntry, dtm: &mut DtmPawn, name: &str) -> bool {
             setup_pieces_pawn(&mut dtm.ei[r][0], e, data, 0, r, false);
         tb_size[r][1] =
             setup_pieces_pawn(&mut dtm.ei[r][1], e, data, 4, r, false);
-        data = unsafe {
-            data.offset(e.num as isize + 1 + (e.pawns[1] > 0) as isize) };
+        data = &data[e.num as usize + 1 + (e.pawns[1] > 0) as usize..];
     }
-    data = align_ptr(data, 2);
+    data = align_slice(data, 2);
 
     let mut size = [[0; 6]; 6];
     let mut flags = 0;
@@ -1131,19 +1138,17 @@ fn init_table_pawn_dtm(e: &PawnEntry, dtm: &mut DtmPawn, name: &str) -> bool {
     }
 
     if !dtm.loss_only {
-        let map = data as *const u16;
+        let map = cast_slice(data, data.len() / 2);
         let mut idx = 0;
         for r in 0..6 {
             for i in 0..2 {
                 dtm.map_idx[r][0][i] = 1 + idx;
-                idx += 1
-                    + u16::from_le(unsafe { *map.offset(idx as isize) });
+                idx += 1 + u16::from_le(map[idx as usize]);
             }
             if split {
                 for i in 0..2 {
                     dtm.map_idx[r][1][i] = 1 + idx;
-                    idx += 1 + u16::from_le(
-                        unsafe { *map.offset(idx as isize) });
+                    idx += 1 + u16::from_le(map[idx as usize]);
                 }
             }
         }
@@ -1169,11 +1174,11 @@ fn init_table_pawn_dtm(e: &PawnEntry, dtm: &mut DtmPawn, name: &str) -> bool {
     }
 
     for r in 0..6 {
-        data = align_ptr(data, 64);
+        data = align_slice(data, 64);
         dtm.ei[r][0].precomp.as_mut().unwrap().data =
             slice(&mut data, size[r][2]);
         if split {
-            data = align_ptr(data, 64);
+            data = align_slice(data, 64);
             dtm.ei[r][1].precomp.as_mut().unwrap().data =
                 slice(&mut data, size[r][5]);
         }
@@ -1189,23 +1194,23 @@ fn init_table_pawn_dtm(e: &PawnEntry, dtm: &mut DtmPawn, name: &str) -> bool {
 fn init_table_piece_dtz(
     e: &PieceEntry, dtz: &mut DtzPiece, name: &str
 ) -> bool {
-    dtz.mapping = map_file(name, DTZ_SUFFIX);
-    if dtz.mapping.is_none() {
+    let tb_map = map_file(name, DTZ_SUFFIX);
+    if tb_map.is_none() {
         return false;
     }
 
-    let mut data = dtz.mapping.as_ref().unwrap().as_ptr();
-
-    if u32::from_le(unsafe { *(data as *const u32) }) != DTZ_MAGIC {
+    if read_magic(&tb_map) != DTZ_MAGIC {
         eprintln!("Corrupted table: {}{}", name, DTZ_SUFFIX);
-        dtz.mapping = None;
         return false;
     }
 
-    data = unsafe { data.offset(5) };
+    dtz.mapping = tb_map;
+    let mut data = mmap_to_slice(&dtz.mapping);
+
+    data = &data[5..];
     let tb_size = setup_pieces_piece(&mut dtz.ei, e, data, 0);
-    data = unsafe { data.offset(e.num as isize + 1) };
-    data = align_ptr(data, 2);
+    data = &data[e.num as usize + 1..];
+    data = align_slice(data, 2);
 
     let mut size = [0; 3];
     let mut flags = 0u8;
@@ -1217,17 +1222,17 @@ fn init_table_piece_dtz(
         let mut idx = 0;
         for i in 0..4 {
             dtz.map_idx[i] = 1 + idx;
-            idx += 1 + unsafe { *data.offset(idx as isize) } as u16;
+            idx += 1 + data[idx as usize] as u16;
         }
         dtz.map = slice(&mut data, idx as usize);
-        data = align_ptr(data, 2);
+        data = align_slice(data, 2);
     }
 
     dtz.ei.precomp.as_mut().unwrap().index_table = slice(&mut data, size[0]);
 
     dtz.ei.precomp.as_mut().unwrap().size_table = slice(&mut data, size[1]);
 
-    data = align_ptr(data, 64);
+    data = align_slice(data, 64);
     dtz.ei.precomp.as_mut().unwrap().data = slice(&mut data, size[2]);
 
     true
@@ -1236,28 +1241,27 @@ fn init_table_piece_dtz(
 fn init_table_pawn_dtz(
     e: &PawnEntry, dtz: &mut DtzPawn, name: &str
 ) -> bool {
-    dtz.mapping = map_file(name, DTZ_SUFFIX);
-    if dtz.mapping.is_none() {
+    let tb_map = map_file(name, DTZ_SUFFIX);
+    if tb_map.is_none() {
         return false;
     }
 
-    let mut data = dtz.mapping.as_ref().unwrap().as_ptr();
-
-    if u32::from_le(unsafe { *(data as *const u32) }) != DTZ_MAGIC {
+    if read_magic(&tb_map) != DTZ_MAGIC {
         eprintln!("Corrupted table: {}{}", name, DTZ_SUFFIX);
-        dtz.mapping = None;
         return false;
     }
 
-    data = unsafe { data.offset(5) };
+    dtz.mapping = tb_map;
+    let mut data = mmap_to_slice(&dtz.mapping);
+
+    data = &data[5..];
 
     let mut tb_size = [0; 4];
     for f in 0..4 {
         tb_size[f] = setup_pieces_pawn(&mut dtz.ei[f], e, data, 0, f, true);
-        data = unsafe {
-            data.offset(e.num as isize + 1 + (e.pawns[1] > 0) as isize) };
+        data = &data[e.num as usize + 1 + (e.pawns[1] > 0) as usize..];
     }
-    data = align_ptr(data, 2);
+    data = align_slice(data, 2);
 
     let mut size = [[0; 3]; 4];
     let mut flags = 0u8;
@@ -1272,12 +1276,12 @@ fn init_table_pawn_dtz(
         if dtz.flags[f] & 2 != 0 {
             for i in 0..4 {
                 dtz.map_idx[f][i] = 1 + idx;
-                idx += 1 + unsafe { *data.offset(idx as isize) } as u16;
+                idx += 1 + data[idx as usize] as u16;
             }
         }
     }
     dtz.map = slice(&mut data, idx as usize);
-    data = align_ptr(data, 2);
+    data = align_slice(data, 2);
 
     for f in 0..4 {
         dtz.ei[f].precomp.as_mut().unwrap().index_table =
@@ -1290,7 +1294,7 @@ fn init_table_pawn_dtz(
     }
 
     for f in 0..4 {
-        data = align_ptr(data, 64);
+        data = align_slice(data, 64);
         dtz.ei[f].precomp.as_mut().unwrap().data = slice(&mut data, size[f][2]);
     }
 
