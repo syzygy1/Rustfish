@@ -887,7 +887,7 @@ impl Position {
 
         // Use a slower but simpler function for uncommon cases
         if m.move_type() != NORMAL {
-            return MoveList::new(self, GenType::Legal).contains(m);
+            return MoveList::new::<Legal>(self).contains(m);
         }
 
         // It is not a promotion, so promotion piece must be empty
@@ -1079,7 +1079,7 @@ impl Position {
 
             let mut rfrom = Square::A1;
             let mut rto = Square::A1;
-            self.do_castling(us, from, &mut to, &mut rfrom, &mut rto, true);
+            self.do_castling::<True>(us, from, &mut to, &mut rfrom, &mut rto);
 
             self.st_mut().psq +=
                 psqt::psq(captured, rto) - psqt::psq(captured, rfrom);
@@ -1259,7 +1259,7 @@ impl Position {
         if m.move_type() == CASTLING {
             let mut rfrom = Square(0);
             let mut rto = Square(0);
-            self.do_castling(us, from, &mut to, &mut rfrom, &mut rto, false);
+            self.do_castling::<False>(us, from, &mut to, &mut rfrom, &mut rto);
         } else {
             // Put the piece back at the source square
             self.move_piece(pc, to, from);
@@ -1293,15 +1293,11 @@ impl Position {
 
     // do_castling() is a helper used to do/undo a castling move. This is
     // a bit tricky in Chess960 where from/to squares can overlap.
-    fn do_castling(
-        &mut self,
-        us: Color,
-        from: Square,
-        to: &mut Square,
-        rfrom: &mut Square,
-        rto: &mut Square,
-        do_castle: bool
+    fn do_castling<Do: Bool>(
+        &mut self, us: Color, from: Square, to: &mut Square,
+        rfrom: &mut Square, rto: &mut Square,
     ) {
+        let do_castle = Do::bool();
         let king_side = *to > from;
         *rfrom = *to; // Castling is encoded as king captures rook
         *rto = relative_square(
@@ -1504,7 +1500,7 @@ impl Position {
     pub fn is_draw(&self, ply: i32) -> bool {
         if self.st().rule50 > 99
             && (self.checkers() == 0
-                || MoveList::new(&self, GenType::Legal).size() != 0)
+                || MoveList::new::<Legal>(&self).size() != 0)
         {
             return true;
         }

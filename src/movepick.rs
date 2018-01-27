@@ -86,7 +86,7 @@ impl ContinuationHistory {
         let p = self.get(Piece(0), Square(0));
         for pc in 0..16 {
             for s in 0..64 {
-                p.v[pc][s].set(search::COUNTER_MOVE_PRUNE_THRESHOLD as i16 - 1);
+                p.v[pc][s].set(search::CM_THRESHOLD as i16 - 1);
             }
         }
     }
@@ -262,7 +262,7 @@ impl MovePicker {
             }
 
             CAPTURES_INIT => {
-                self.end_moves = generate_captures(pos, &mut self.list, 0);
+                self.end_moves = generate::<Captures>(pos, &mut self.list, 0);
                 score_captures(pos, &mut self.list[..self.end_moves]);
                 self.stage += 1;
             }
@@ -323,7 +323,8 @@ impl MovePicker {
 
             QUIET_INIT => {
                 self.cur = self.end_bad_captures;
-                self.end_moves = generate_quiets(pos, &mut self.list, self.cur);
+                self.end_moves = generate::<Quiets>(pos, &mut self.list,
+                    self.cur);
                 score_quiets(pos, self);
                 partial_insertion_sort(&mut self.list[self.cur..self.end_moves],
                     -4000 * self.depth / ONE_PLY);
@@ -359,7 +360,7 @@ impl MovePicker {
 
             EVASIONS_INIT => {
                 self.cur = 0;
-                self.end_moves = generate_evasions(pos, &mut self.list, 0);
+                self.end_moves = generate::<Evasions>(pos, &mut self.list, 0);
                 score_evasions(pos, &mut self.list[..self.end_moves]);
                 self.stage += 1;
             }
@@ -428,7 +429,7 @@ impl MovePickerQ {
             
             EVASIONS_INIT => {
                 self.cur = 0;
-                self.end_moves = generate_evasions(pos, &mut self.list, 0);
+                self.end_moves = generate::<Evasions>(pos, &mut self.list, 0);
                 score_evasions(pos, &mut self.list[..self.end_moves]);
                 self.stage += 1;
             }
@@ -446,7 +447,7 @@ impl MovePickerQ {
 
             QCAPTURES_1_INIT | QCAPTURES_2_INIT | QSEARCH_RECAPTURES => {
                 self.cur = 0;
-                self.end_moves = generate_captures(pos, &mut self.list, 0);
+                self.end_moves = generate::<Captures>(pos, &mut self.list, 0);
                 score_captures(pos, &mut self.list[..self.end_moves]);
                 self.stage += 1;
             }
@@ -463,7 +464,7 @@ impl MovePickerQ {
                     break;
                 }
                 self.cur = 0;
-                self.end_moves = generate_quiet_checks(pos, &mut self.list, 0);
+                self.end_moves = generate::<QuietChecks>(pos, &mut self.list, 0);
                 self.stage += 1;
             }
 
@@ -530,7 +531,7 @@ impl MovePickerPC {
 
             PROBCUT_INIT => {
                 self.cur = 0;
-                self.end_moves = generate_captures(pos, &mut self.list, 0);
+                self.end_moves = generate::<Captures>(pos, &mut self.list, 0);
                 score_captures(pos, &mut self.list[..self.end_moves]);
                 self.stage += 1;
             }

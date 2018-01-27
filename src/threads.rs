@@ -288,7 +288,7 @@ pub fn start_thinking(
     }
 
     let mut root_moves = RootMoves::new();
-    for m in MoveList::new(pos, GenType::Legal) {
+    for m in MoveList::new::<Legal>(pos) {
         if searchmoves.is_empty()
             || searchmoves.iter().any(|&x| x == m)
         {

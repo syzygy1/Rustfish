@@ -61,6 +61,31 @@ impl Iterator for Color {
     }
 }
 
+pub struct White;
+pub struct Black;
+
+pub trait ColorTrait {
+    type KingSide: CastlingRightTrait;
+    type QueenSide: CastlingRightTrait;
+    fn color() -> Color;
+}
+
+impl ColorTrait for White {
+    type KingSide = WhiteOO;
+    type QueenSide = WhiteOOO;
+    fn color() -> Color {
+        WHITE
+    }
+}
+
+impl ColorTrait for Black {
+    type KingSide = BlackOO;
+    type QueenSide = BlackOOO;
+    fn color() -> Color {
+        BLACK
+    }
+}
+
 #[allow(non_camel_case_types)]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum CastlingSide {
@@ -77,6 +102,39 @@ pub const WHITE_OOO   : CastlingRight = CastlingRight(2);
 pub const BLACK_OO    : CastlingRight = CastlingRight(4);
 pub const BLACK_OOO   : CastlingRight = CastlingRight(8);
 pub const ANY_CASTLING: CastlingRight = CastlingRight(15);
+
+pub trait CastlingRightTrait {
+    fn castling_right() -> CastlingRight;
+}
+
+pub struct WhiteOO;
+pub struct WhiteOOO;
+pub struct BlackOO;
+pub struct BlackOOO;
+
+impl CastlingRightTrait for WhiteOO {
+    fn castling_right() -> CastlingRight {
+        WHITE_OO
+    }
+}
+
+impl CastlingRightTrait for WhiteOOO {
+    fn castling_right() -> CastlingRight {
+        WHITE_OOO
+    }
+}
+
+impl CastlingRightTrait for BlackOO {
+    fn castling_right() -> CastlingRight {
+        BLACK_OO
+    }
+}
+
+impl CastlingRightTrait for BlackOOO {
+    fn castling_right() -> CastlingRight {
+        BLACK_OOO
+    }
+}
 
 impl CastlingRight {
     pub fn make(c: Color, cs: CastlingSide) -> CastlingRight {
@@ -202,6 +260,55 @@ pub const KING  : PieceType = PieceType(6);
 pub const QUEEN_DIAGONAL: PieceType = PieceType(7);
 
 pub const ALL_PIECES: PieceType = PieceType(0);
+
+pub struct Pawn;
+pub struct Knight;
+pub struct Bishop;
+pub struct Rook;
+pub struct Queen;
+pub struct King;
+
+pub trait PieceTypeTrait {
+    fn piece_type() -> PieceType;
+}
+
+impl PieceTypeTrait for Pawn {
+    fn piece_type() -> PieceType {
+        PAWN
+    }
+}
+
+impl PieceTypeTrait for Knight {
+    fn piece_type() -> PieceType {
+        KNIGHT
+    }
+}
+
+impl PieceTypeTrait for Bishop {
+    fn piece_type() -> PieceType {
+        BISHOP
+    }
+}
+
+impl PieceTypeTrait for Rook {
+    fn piece_type() -> PieceType {
+        ROOK
+    }
+}
+
+impl PieceTypeTrait for Queen {
+    fn piece_type() -> PieceType {
+        QUEEN
+    }
+}
+
+impl PieceTypeTrait for King {
+    fn piece_type() -> PieceType {
+        KING
+    }
+}
+
+
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Piece(pub u32);
@@ -868,5 +975,24 @@ impl std::ops::Mul<i32> for Score {
     type Output = Self;
     fn mul(self, rhs: i32) -> Self {
         Score::make(rhs * self.mg().0, rhs * self.eg().0)
+    }
+}
+
+pub struct True {}
+pub struct False {}
+
+pub trait Bool {
+    fn bool() -> bool;
+}
+
+impl Bool for True {
+    fn bool() -> bool {
+        true
+    }
+}
+
+impl Bool for False {
+    fn bool() -> bool {
+        false
     }
 }

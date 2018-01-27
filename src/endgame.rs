@@ -2,7 +2,7 @@
 
 use bitbases;
 use bitboard::*;
-use movegen::{GenType, MoveList};
+use movegen::*;
 use position::Position;
 use position::zobrist;
 use types::*;
@@ -166,7 +166,7 @@ pub fn evaluate_kxk(pos: &Position, strong_side: Color) -> Value
 
     // Stalemate detection with lone king
     if pos.side_to_move() == weak_side {
-        if MoveList::new(pos, GenType::Legal).size() == 0 {
+        if MoveList::new::<Legal>(pos).size() == 0 {
             return Value::DRAW;
         }
     }
