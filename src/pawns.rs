@@ -24,12 +24,6 @@ static mut CONNECTED: [[[[Score; 8]; 3]; 2]; 2] =
 // Doubled pawn penalty
 const DOUBLED: Score = S!(18, 38);
 
-// Lever bonus by rank
-const LEVER: [Score; 8] = [
-    S!( 0,  0), S!( 0,  0), S!(0, 0), S!(0, 0),
-    S!(17, 16), S!(33, 32), S!(0, 0), S!(0, 0)
-];
-
 // Weakness of our pawn shelter in front of the king by
 // [is_king_file][distance from edge][rank]. RANK_1 = 0 is used for files
 // where we have no pawns or our pawn is behind our king.
@@ -398,10 +392,6 @@ fn evaluate<C: ColorTrait>(pos: &Position, e: &mut Entry) -> Score {
 
         if doubled != 0 && supported == 0 {
             score -= DOUBLED;
-        }
-
-        if lever != 0 {
-            score += LEVER[s.relative_rank(us) as usize];
         }
     }
 

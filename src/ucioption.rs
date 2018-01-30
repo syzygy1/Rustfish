@@ -106,7 +106,7 @@ pub fn init()
     opts.push(Opt::new("Minimum Thinking Time", OptVal::spin(20, 0, 5000),
         None));
     opts.push(Opt::new("Slow Mover", OptVal::spin(89, 10, 1000), None));
-    opts.push(Opt::new("UCI_Analysis", OptVal::check(false), None));
+    opts.push(Opt::new("UCI_AnalyseMode", OptVal::check(false), None));
     opts.push(Opt::new("UCI_Chess960", OptVal::check(false), None));
     opts.push(Opt::new("SyzygyPath", OptVal::string("<empty>"),
         Some(on_tb_path)));

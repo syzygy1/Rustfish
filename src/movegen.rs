@@ -25,44 +25,32 @@ pub trait GenType {
 
 impl GenType for Captures {
     type Checks = False;
-    fn gen_type() -> i32 {
-        CAPTURES
-    }
+    fn gen_type() -> i32 { CAPTURES }
 }
 
 impl GenType for Quiets {
     type Checks = False;
-    fn gen_type() -> i32 {
-        QUIETS
-    }
+    fn gen_type() -> i32 { QUIETS }
 }
 
 impl GenType for QuietChecks {
     type Checks = True;
-    fn gen_type() -> i32 {
-        QUIET_CHECKS
-    }
+    fn gen_type() -> i32 { QUIET_CHECKS }
 }
 
 impl GenType for Evasions {
     type Checks = False;
-    fn gen_type() -> i32 {
-        EVASIONS
-    }
+    fn gen_type() -> i32 { EVASIONS }
 }
 
 impl GenType for NonEvasions {
     type Checks = False;
-    fn gen_type() -> i32 {
-        NON_EVASIONS
-    }
+    fn gen_type() -> i32 { NON_EVASIONS }
 }
 
 impl GenType for Legal {
     type Checks = False;
-    fn gen_type() -> i32 {
-        LEGAL
-    }
+    fn gen_type() -> i32 { LEGAL }
 }
 
 #[derive(Clone, Copy)]

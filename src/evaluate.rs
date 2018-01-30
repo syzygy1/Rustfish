@@ -155,8 +155,8 @@ const THREAT_BY_KING: [Score; 2] = [ S!(3, 62), S!(9, 138) ];
 // PASSED[mg/eg][Rank] contains midgame and endgame bonuses for passed pawns.
 // We don't use a Score because we process the two components independently.
 const PASSED: [[i32; 8]; 2] = [
-    [ 5,  5, 31, 73, 166, 252, 0, 0],
-    [ 7, 14, 38, 73, 166, 252, 0, 0],
+    [ 0, 5,  5, 31, 73, 166, 252, 0 ],
+    [ 0, 7, 14, 38, 73, 166, 252, 0 ],
 ];
 
 // PASSED_FILE[File] contains a bonus according to the file of a passed pawn
@@ -164,6 +164,9 @@ const PASSED_FILE: [Score; 8] = [
     S!(  9, 10), S!(  2, 10), S!(  1, -8), S!(-20,-12),
     S!(-20,-12), S!(  1, -8), S!(  2, 10), S!(  9, 10),
 ];
+
+// Rank-dependent factor for a passed-pawn bonus
+const RANK_FACTOR: [i32; 8] = [ 0, 0, 0, 2, 6, 11, 16, 0 ];
 
 // KING_PROTECTOR[PieceType-2] contains a bonus according to distance from
 // king
@@ -652,6 +655,11 @@ fn evaluate_threats<C: ColorTrait>(pos: &Position, ei: &EvalInfo) -> Score {
     score
 }
 
+// Helper function
+fn capped_distance(s1: Square, s2: Square) -> i32 {
+    std::cmp::min(Square::distance(s1, s2), 5) as i32
+}
+
 // evaluate_passed_pawns() evaluates the passed pawns and candidate passed
 // pawns of the given color.
 
@@ -674,8 +682,8 @@ fn evaluate_passed_pawns<C: ColorTrait>(
                 | pos.pieces_c(them));
         score -= HINDER_PASSED_PAWN * popcount(bb) as i32;
 
-        let r = (s.relative_rank(us) - RANK_2) as i32;
-        let rr = r * (r - 1);
+        let r = s.relative_rank(us);
+        let rr = RANK_FACTOR[r as usize];
 
         let mut mbonus = PASSED[MG][r as usize];
         let mut ebonus = PASSED[EG][r as usize];
@@ -684,13 +692,14 @@ fn evaluate_passed_pawns<C: ColorTrait>(
             let block_sq = s + up;
 
             // Adjust bonus based on the king's proximity
-            ebonus += Square::distance(pos.square(them, KING), block_sq) as i32 * 5 * rr
-                    - Square::distance(pos.square(  us, KING), block_sq) as i32 * 2 * rr;
+            ebonus += capped_distance(pos.square(them, KING), block_sq) * 5 * rr
+                - capped_distance(pos.square(us, KING), block_sq) * 2 * rr;
 
             // If block_sq is not the queening square then consider also a
             // second push
-            if block_sq.relative_rank(us) != RANK_8 {
-                ebonus -= Square::distance(pos.square(us, KING), block_sq + up) as i32 * rr;
+            if r != RANK_7 {
+                ebonus -=
+                    capped_distance(pos.square(us, KING), block_sq + up) * rr;
             }
 
             // If the pawn is free to advance, then increase the bonus
@@ -736,8 +745,8 @@ fn evaluate_passed_pawns<C: ColorTrait>(
                 mbonus += k * rr;
                 ebonus += k * rr;
             } else if pos.pieces_c(us) & block_sq != 0 {
-                mbonus += rr + r * 2;
-                ebonus += rr + r * 2;
+                mbonus += rr + r as i32 * 2;
+                ebonus += rr + r as i32 * 2;
             }
         } // rr != 0
 

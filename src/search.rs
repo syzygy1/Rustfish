@@ -154,15 +154,11 @@ trait NodeType {
 }
 
 impl NodeType for NonPv {
-    fn node_type() -> usize {
-        NON_PV
-    }
+    fn node_type() -> usize { NON_PV }
 }
 
 impl NodeType for Pv {
-    fn node_type() -> usize {
-        PV
-    }
+    fn node_type() -> usize { PV }
 }
 
 // Sizes and phases of the skip blocks, used for distributing search depths
@@ -294,7 +290,7 @@ pub fn mainthread_search(pos: &mut Position, th: &threads::ThreadCtrl) {
     pos.previous_score = Value::INFINITE;
     pos.previous_time_reduction = 1.0;
 
-    let analyzing = limits().infinite || ucioption::get_bool("UCI_Analysis");
+    let analyzing = limits().infinite || ucioption::get_bool("UCI_AnalyseMode");
 
     // When analyzing, use contempt only if the user has said so
     let contempt =
