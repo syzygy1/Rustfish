@@ -183,6 +183,8 @@ fn pick_best(list: &mut [ExtMove]) -> Move {
             q = p;
         }
     }
+//    let q = list.iter().enumerate()
+//        .min_by(|&(_, x), &(_, y)| y.value.cmp(&x.value)).unwrap().0;
     list.swap(0, q);
     list[0].m
 }
@@ -220,7 +222,7 @@ fn score_evasions(pos: &Position, list: &mut [ExtMove]) {
             - pos.moved_piece(m.m).piece_type().0 as i32
         } else {
             pos.main_history.get(pos.side_to_move(), m.m) - (1 << 28)
-        };
+        }
     }
 }
 

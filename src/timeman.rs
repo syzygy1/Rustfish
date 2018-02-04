@@ -46,12 +46,12 @@ fn importance(ply: i32) -> f64 {
     const XSHIFT: f64 = 58.4;
     const SKEW:   f64 = 0.183;
 
-    (1. + (((ply as f64 - XSHIFT) / XSCALE)).exp()).powf(-SKEW)
+    (1. + ((ply as f64 - XSHIFT) / XSCALE).exp()).powf(-SKEW)
     + std::f64::MIN_POSITIVE
 }
 
 fn remaining(
-    my_time: i64, movestogo: i32, ply: i32, slow_mover: i32,
+    my_time: i64, movestogo: i32, ply: i32, slow_mover: i64,
     time_type: TimeType
 ) -> i64 {
     let max_ratio = if time_type == OptimumTime { 1. } else { MAX_RATIO };
@@ -83,12 +83,15 @@ fn remaining(
 
 pub fn init(limits: &mut search::LimitsType, us: Color, ply: i32)
 {
-    let min_thinking_time = ucioption::get_i32("Minimum Thinking Time");
-    let move_overhead     = ucioption::get_i32("Move Overhead");
-    let slow_mover        = ucioption::get_i32("Slow Mover");
+    let min_think_time = ucioption::get_i32("Minimum Thinking Time") as i64;
+    let move_overhead  = ucioption::get_i32("Move Overhead") as i64;
+    let slow_mover     = ucioption::get_i32("Slow Mover") as i64;
 
     unsafe {
         START_TIME = limits.start_time;
+        let time = std::cmp::max(limits.time[us.0 as usize], min_think_time);
+        OPTIMUM_TIME = time;
+        MAXIMUM_TIME = time;
     }
 
     let max_mtg = if limits.movestogo != 0
@@ -101,13 +104,15 @@ pub fn init(limits: &mut search::LimitsType, us: Color, ply: i32)
     // the greates hyp_mtg givse the minimum values.
     for hyp_mtg in 1..(max_mtg + 1) {
         // Calculate thinking time for hypothetical "moves to go" value
-        let hyp_my_time = limits.time[us.0 as usize]
+        let mut hyp_my_time = limits.time[us.0 as usize]
             + limits.inc[us.0 as usize] * (hyp_mtg - 1) as i64
-            - move_overhead as i64 * (2 + std::cmp::min(hyp_mtg, 40) as i64);
+            - move_overhead * (2 + std::cmp::min(hyp_mtg, 40) as i64);
 
-        let t1 = min_thinking_time as i64
+        hyp_my_time = std::cmp::max(hyp_my_time, 0);
+
+        let t1 = min_think_time
             + remaining(hyp_my_time, hyp_mtg, ply, slow_mover, OptimumTime);
-        let t2 = min_thinking_time as i64
+        let t2 = min_think_time
             + remaining(hyp_my_time, hyp_mtg, ply, slow_mover, MaxTime);
 
         unsafe {

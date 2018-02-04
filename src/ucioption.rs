@@ -102,7 +102,7 @@ pub fn init()
     opts.push(Opt::new("Clear Hash", OptVal::Button, Some(on_clear_hash)));
     opts.push(Opt::new("Ponder", OptVal::check(false), None));
     opts.push(Opt::new("MultiPV", OptVal::spin(1, 1, 500), None));
-    opts.push(Opt::new("Move Overhead", OptVal::spin(100, 0, 5000), None));
+    opts.push(Opt::new("Move Overhead", OptVal::spin(30, 0, 5000), None));
     opts.push(Opt::new("Minimum Thinking Time", OptVal::spin(20, 0, 5000),
         None));
     opts.push(Opt::new("Slow Mover", OptVal::spin(89, 10, 1000), None));
@@ -146,8 +146,7 @@ pub fn set(key: &str, val: &str) {
     if let Some(opt) = opts.iter_mut().find(|ref o| o.key == key) {
         match opt.val {
             OptVal::StringOpt { ref mut cur, .. } => *cur = String::from(val),
-            OptVal::Spin { ref mut cur, .. } =>
-                *cur = val.parse::<i32>().unwrap(),
+            OptVal::Spin { ref mut cur, .. } => *cur = val.parse().unwrap(),
             OptVal::Check { ref mut cur, .. } => *cur = val == "true",
             OptVal::Button => {},
         }

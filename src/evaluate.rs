@@ -400,8 +400,8 @@ fn evaluate_pieces<C: ColorTrait, Pt: PieceTypeTrait> (
                 let ksq = pos.square(us, KING);
 
                 if (ksq.file() < FILE_E) == (s.file() < ksq.file())
-                    && ei.pe.semiopen_side(us, ksq.file(), s.file()
-                        < ksq.file()) == 0
+                    && ei.pe.semiopen_side(us, ksq.file(), s.file() <
+                        ksq.file()) == 0
                 {
                     score -= (TRAPPED_ROOK - Score::make((mob as i32) * 22, 0))
                         * (1 + ((!pos.can_castle(us)) as i32));
@@ -438,8 +438,8 @@ fn evaluate_king<C: ColorTrait>(pos: &Position, ei: &mut EvalInfo) -> Score {
     let mut score = ei.pe.king_safety::<C>(pos, ksq);
 
     // Main king safety evaluation
-    if ei.king_attackers_count[them.0 as usize]
-        > (1 - popcount(pos.pieces_cp(them, QUEEN)) as i32)
+    if ei.king_attackers_count[them.0 as usize] >
+        (1 - popcount(pos.pieces_cp(them, QUEEN)) as i32)
     {
         // Attacked squares defended at most once by our queen or king
         let weak =
@@ -529,8 +529,7 @@ fn evaluate_king<C: ColorTrait>(pos: &Position, ei: &mut EvalInfo) -> Score {
 
     debug_assert!(((if us == WHITE { b << 4 } else { b >> 4 }) & b) == 0);
     debug_assert!(
-        popcount(if us == WHITE { b << 4 } else { b >> 4 }) == popcount(b)
-    );
+        popcount(if us == WHITE { b << 4 } else { b >> 4 }) == popcount(b));
 
     // Second, add the squares which are attacked twice in that flank and
     // which are not defended by our pawns.
@@ -784,8 +783,7 @@ fn evaluate_space<C: ColorTrait>(pos: &Position, ei: &EvalInfo) -> Score {
     // Find the safe squares for our pieces inside the areas defended by
     // SpaceMask. A square is unsafe if it is attacked by an enemy pawn
     // or if it is undefended and attacked by an enemy piece.
-    let safe =
-        space_mask
+    let safe = space_mask
         & !pos.pieces_cp(us, PAWN)
         & !ei.attacked_by[them.0 as usize][PAWN.0 as usize]
         & (ei.attacked_by[us.0 as usize][ALL_PIECES.0 as usize]
@@ -801,11 +799,9 @@ fn evaluate_space<C: ColorTrait>(pos: &Position, ei: &EvalInfo) -> Score {
     debug_assert!((safe >> (if us == WHITE { 32 } else { 0 })).0 as u32 == 0);
 
     // ...count safe + (behind & safe) with a single popcount.
-    let bonus =
-        popcount(
+    let bonus = popcount(
             (if us == WHITE { safe << 32 } else { safe >> 32 })
-            | (behind & safe)
-        ) as i32;
+            | (behind & safe)) as i32;
     let weight = pos.count(us, ALL_PIECES) - 2 * ei.pe.open_files();
 
     Score::make(bonus * weight * weight / 16, 0)
@@ -833,8 +829,8 @@ fn evaluate_initiative(pos: &Position, ei: &EvalInfo, eg: Value) -> Score {
     // Now apply the bonus: note that we find the attacking side by extracting
     // the sign of the endgame value and that we carefully cap the bonus so
     // that the endgame score will never change sign after the bonus.
-    let v = ((eg.0 > 0) as i32 - (eg.0 < 0) as i32)
-            * std::cmp::max(initiative, -eg.0.abs());
+    let v = ((eg.0 > 0) as i32 - (eg.0 < 0) as i32) *
+        std::cmp::max(initiative, -eg.0.abs());
 
     Score::make(0, v)
 }
@@ -945,9 +941,9 @@ pub fn evaluate(pos: &Position) -> Value {
 
     // Interpolate between a middlegame and a (scaled by 'sf') endgame score
     let sf = evaluate_scale_factor(pos, &ei, score.eg());
-    let mut v =  score.mg() * ei.me.game_phase()
-               + score.eg() * (PHASE_MIDGAME - ei.me.game_phase()) *
-                            sf.0 / ScaleFactor::NORMAL.0;
+    let mut v = score.mg() * ei.me.game_phase()
+        + score.eg() * (PHASE_MIDGAME - ei.me.game_phase()) *
+            sf.0 / ScaleFactor::NORMAL.0;
 
     v /= PHASE_MIDGAME;
 

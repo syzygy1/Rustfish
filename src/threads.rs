@@ -30,6 +30,7 @@ pub struct SearchResult {
 pub struct ThreadState {
     pub exit: bool,
     pub searching: bool,
+    pub clear: bool,
 }
 
 pub struct CommonState {
@@ -55,6 +56,7 @@ impl ThreadCtrl {
             state: Mutex::new(ThreadState {
                 exit: false,
                 searching: true,
+                clear: false,
             }),
             common: Mutex::new(CommonState {
                 root_moves: Arc::new(Vec::new()),
@@ -149,7 +151,7 @@ pub fn set(requested: usize) {
     while handlers.len() > requested {
         let handler = handlers.pop().unwrap();
         let th = threads.pop().unwrap();
-        wake_up(&th, true);
+        wake_up(&th, true, false);
         let _ = handler.join();
     }
 
@@ -185,6 +187,20 @@ fn run_thread(idx: usize, tx: Sender<Arc<ThreadCtrl>>) {
         if state.exit {
             break;
         }
+        if state.clear {
+            // Clear this thread as part of ucinewgame
+            if th.idx == 0 {
+                pos.previous_score = Value::INFINITE;
+                pos.previous_time_reduction = 1.;
+            }
+            pos.counter_moves = unsafe { std::mem::zeroed() };
+            pos.main_history = unsafe { std::mem::zeroed() };
+            pos.capture_history = unsafe { std::mem::zeroed() };
+            pos.cont_history = unsafe { std::mem::zeroed() };
+            pos.cont_history.init();
+            state.clear = false;
+            continue;
+        }
         {
             let common = th.common.lock().unwrap();
             let pos_data = common.pos_data.read().unwrap();
@@ -197,7 +213,7 @@ fn run_thread(idx: usize, tx: Sender<Arc<ThreadCtrl>>) {
             let fen = pos.fen();
             pos.set(&fen, ucioption::get_bool("UCI_Chess960"));
             pos.root_moves = (*common.root_moves).clone();
-        }
+        } // Locks are dropped here
         pos.nodes = 0;
         pos.tb_hits = 0;
         if th.idx == 0 {
@@ -218,11 +234,12 @@ fn run_thread(idx: usize, tx: Sender<Arc<ThreadCtrl>>) {
     }
 }
 
-fn wake_up(th: &ThreadCtrl, exit: bool)
+fn wake_up(th: &ThreadCtrl, exit: bool, clear: bool)
 {
     let mut state = th.state.lock().unwrap();
     state.searching = true;
     state.exit = exit;
+    state.clear = clear;
     th.cv.notify_one();
 }
 
@@ -232,8 +249,19 @@ pub fn wake_up_slaves()
 
     for th in threads.iter() {
         if th.idx != 0 {
-            wake_up(th, false);
+            wake_up(th, false, false);
         }
+    }
+
+    std::mem::forget(threads);
+}
+
+pub fn clear_search()
+{
+    let threads: Box<Threads> = unsafe { Box::from_raw(THREADS) };
+
+    for th in threads.iter() {
+        wake_up(th, false, true);
     }
 
     std::mem::forget(threads);
@@ -265,6 +293,20 @@ pub fn wait_for_slaves()
             while state.searching {
                 state = th.cv.wait(state).unwrap();
             }
+        }
+    }
+
+    std::mem::forget(threads);
+}
+
+pub fn wait_for_all()
+{
+    let threads: Box<Threads> = unsafe { Box::from_raw(THREADS) };
+
+    for th in threads.iter() {
+        let mut state = th.state.lock().unwrap();
+        while state.searching {
+            state = th.cv.wait(state).unwrap();
         }
     }
 
@@ -315,7 +357,7 @@ pub fn start_thinking(
         common.result = result.clone();
     }
 
-    wake_up(&threads[0], false);
+    wake_up(&threads[0], false, false);
 
     std::mem::forget(threads);
 }

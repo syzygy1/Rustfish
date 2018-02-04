@@ -453,10 +453,9 @@ impl Position {
         println!("\n +---+---+---+---+---+---+---+---+");
         for r in (0..8).rev() {
             for f in 0..8 {
-                print!(" | {}", Position::PIECE_TO_CHAR
-                        .chars()
-                        .nth(self.piece_on(Square::make(f, r)).0 as usize)
-                        .unwrap());
+                print!(" | {}", Position::PIECE_TO_CHAR.chars()
+                    .nth(self.piece_on(Square::make(f, r)).0 as usize)
+                    .unwrap());
             }
             println!(" |\n +---+---+---+---+---+---+---+---+");
         }
@@ -574,9 +573,9 @@ impl Position {
             }
         }
 
-        // 5-6. Halfmvoe clock and fullmove number
+        // 5-6. Halfmove clock and fullmove number
         if let Some(halfmove) = iter.next() {
-            self.st_mut().rule50 = halfmove.parse::<i32>().unwrap();
+            self.st_mut().rule50 = halfmove.parse().unwrap();
         } else {
             self.st_mut().rule50 = 0;
         }
@@ -613,8 +612,10 @@ impl Position {
         self.castling_rights_mask[rfrom.0 as usize] |= cr;
         self.castling_rook_square[cr.0 as usize] = rfrom;
 
-        let kto = relative_square(c, if cs == CastlingSide::KING { Square::G1 } else { Square::C1 });
-        let rto = relative_square(c, if cs == CastlingSide::KING { Square::F1 } else { Square::D1 });
+        let kto = relative_square(c,
+            if cs == CastlingSide::KING { Square::G1 } else { Square::C1 });
+        let rto = relative_square(c,
+            if cs == CastlingSide::KING { Square::F1 } else { Square::D1 });
 
         let mut s = std::cmp::min(rfrom, rto);
         while s <= std::cmp::max(rfrom, rto) {
@@ -800,10 +801,7 @@ impl Position {
     // color of the slider.
 
     pub fn slider_blockers(
-        &self,
-        sliders: Bitboard,
-        s: Square,
-        pinners: &mut Bitboard
+        &self, sliders: Bitboard, s: Square, pinners: &mut Bitboard
     ) -> Bitboard {
         let mut result = Bitboard(0);
         *pinners = Bitboard(0);
@@ -940,8 +938,7 @@ impl Position {
                 // Our move must be a blocking evasion or a capture of the
                 // checking piece
                 if (between_bb(lsb(self.checkers()), self.square(us, KING))
-                        | self.checkers())
-                    & to == 0
+                    | self.checkers()) & to == 0
                 {
                     return false;
                 }
@@ -949,7 +946,7 @@ impl Position {
             // In case of king moves under check we have to remove king so as
             // to catch invalid moves like b1a1 when opposite queen is on c1.
             else if self.attackers_to_occ(to, self.pieces() ^ from)
-                    & self.pieces_c(!us) != 0
+                & self.pieces_c(!us) != 0
             {
                 return false;
             }
@@ -1009,14 +1006,10 @@ impl Position {
             CASTLING => {
                 let kfrom = from;
                 let rfrom = to; // Castling is encoded as king captures rook
-                let kto = relative_square(
-                    self.side_to_move(),
-                    if rfrom > kfrom { Square::G1 } else { Square::C1 }
-                );
-                let rto = relative_square(
-                    self.side_to_move(),
-                    if rfrom > kfrom { Square::F1 } else { Square::D1 }
-                );
+                let kto = relative_square(self.side_to_move(),
+                    if rfrom > kfrom { Square::G1 } else { Square::C1 });
+                let rto = relative_square(self.side_to_move(),
+                    if rfrom > kfrom { Square::F1 } else { Square::D1 });
 
                 (pseudo_attacks(ROOK, rto)
                     & self.square(!self.side_to_move(), KING)) != 0
@@ -1067,8 +1060,7 @@ impl Position {
             };
 
         debug_assert!(pc.color() == us);
-        debug_assert!(
-            captured == NO_PIECE
+        debug_assert!(captured == NO_PIECE
             || captured.color() ==
                 if m.move_type() != CASTLING { them } else { us }
         );
@@ -1143,8 +1135,7 @@ impl Position {
             && self.castling_rights_mask[from.0 as usize]
                 | self.castling_rights_mask[to.0 as usize] != 0
         {
-            let cr =
-                self.castling_rights_mask[from.0 as usize]
+            let cr = self.castling_rights_mask[from.0 as usize]
                 | self.castling_rights_mask[to.0 as usize];
             k ^= zobrist::castling(self.st().castling_rights & cr);
             self.st_mut().castling_rights &= !cr;
@@ -1168,10 +1159,8 @@ impl Position {
                 let promotion = Piece::make(us, m.promotion_type());
 
                 debug_assert!(to.relative_rank(us) == RANK_8);
-                debug_assert!(
-                    promotion.piece_type() >= KNIGHT
-                    && promotion.piece_type() <= QUEEN
-                );
+                debug_assert!( promotion.piece_type() >= KNIGHT
+                    && promotion.piece_type() <= QUEEN);
 
                 self.remove_piece(pc, to);
                 self.put_piece(promotion, to);
@@ -1248,8 +1237,7 @@ impl Position {
             debug_assert!(to.relative_rank(us) == RANK_8);
             debug_assert!(pc.piece_type() == m.promotion_type());
             debug_assert!(
-                pc.piece_type() >= KNIGHT && pc.piece_type() <= QUEEN
-            );
+                pc.piece_type() >= KNIGHT && pc.piece_type() <= QUEEN);
 
             self.remove_piece(pc, to);
             pc = Piece::make(us, PAWN);
@@ -1274,8 +1262,7 @@ impl Position {
                     debug_assert!(to.relative_rank(us) == RANK_6);
                     debug_assert!(self.piece_on(capsq) == NO_PIECE);
                     debug_assert!(
-                        self.st().captured_piece == Piece::make(!us, PAWN)
-                    );
+                        self.st().captured_piece == Piece::make(!us, PAWN));
                 }
 
                 // Restore the captured piece
@@ -1300,14 +1287,10 @@ impl Position {
         let do_castle = Do::bool();
         let king_side = *to > from;
         *rfrom = *to; // Castling is encoded as king captures rook
-        *rto = relative_square(
-            us,
-            if king_side { Square::F1 } else { Square::D1 }
-        );
-        *to = relative_square(
-            us,
-            if king_side { Square::G1 } else { Square::C1 }
-        );
+        *rto = relative_square(us,
+            if king_side { Square::F1 } else { Square::D1 });
+        *to = relative_square(us,
+            if king_side { Square::G1 } else { Square::C1 });
 
         // Remove both pieces first since squares could overlap in Chess960
         self.remove_piece(Piece::make(us, KING),
@@ -1333,8 +1316,7 @@ impl Position {
         self.states.push(st_copy);
 
         if self.st().ep_square != Square::NONE {
-            self.st_mut().key ^=
-                zobrist::enpassant(self.st().ep_square.file());
+            self.st_mut().key ^= zobrist::enpassant(self.st().ep_square.file());
             self.st_mut().ep_square = Square::NONE;
         }
 

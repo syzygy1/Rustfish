@@ -259,16 +259,10 @@ pub fn init() {
 // search::clear() resets search state to its initial value
 
 pub fn clear() {
-
-    // wait for search finished
-
+    threads::wait_for_all();
     tt::clear();
-
-    // for th
-
-//    pos.calls_cnt = 0;
-//    pos.previous_score = Value::INFINITE;
-//    pos.previous_time_reduction = 1;
+    threads::clear_search();
+    threads::wait_for_all();
 }
 
 // mainthread_search() is called by the main thread when the program
@@ -286,10 +280,6 @@ pub fn mainthread_search(pos: &mut Position, th: &threads::ThreadCtrl) {
     timeman::init(limits(), us, pos.game_ply());
     tt::new_search();
 
-    pos.calls_cnt = 0;
-    pos.previous_score = Value::INFINITE;
-    pos.previous_time_reduction = 1.0;
-
     let analyzing = limits().infinite || ucioption::get_bool("UCI_AnalyseMode");
 
     // When analyzing, use contempt only if the user has said so
@@ -304,7 +294,7 @@ pub fn mainthread_search(pos: &mut Position, th: &threads::ThreadCtrl) {
 
     unsafe {
         evaluate::CONTEMPT = if analyzing || us == WHITE { contempt }
-            else { -contempt };
+            else { -contempt }
     }
 
     if pos.root_moves.is_empty() {
@@ -558,8 +548,7 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
             pos.root_moves[pv_first..pos.pv_idx+1].sort();
 
             if pos.is_main
-                && (threads::stop()
-                    || pos.pv_idx + 1 == multi_pv
+                && (threads::stop() || pos.pv_idx + 1 == multi_pv
                     || timeman::elapsed() > 3000)
             {
                 print_pv(pos, root_depth, alpha, beta);
@@ -611,7 +600,7 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                 // time for this move, the longer the move has been stable,
                 // the more. Use part of the gained time from a previous
                 // stable move for the current move.
-                time_reduction = 1.0f64;
+                time_reduction = 1.;
                 for i in 3..6 {
                     if last_best_move_depth * i < pos.completed_depth
                         && !think_hard
