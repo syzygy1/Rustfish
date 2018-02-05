@@ -41,3 +41,4 @@ pub fn engine_info(to_uci: bool) -> String {
             " by Syzygy based on Stockfish"
         })
 }
+

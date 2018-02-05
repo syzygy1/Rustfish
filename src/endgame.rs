@@ -544,6 +544,8 @@ fn scale_krpkr(pos: &Position, strong_side: Color) -> ScaleFactor {
         && wrsq == Square::A8
         && (bksq == Square::H7 || bksq == Square::G7)
         && brsq.file() == FILE_A
+        && (brsq.rank() <= RANK_3 || wksq.file() >= FILE_D
+            || wksq.rank() <= RANK_5)
     {
         return ScaleFactor::DRAW;
     }
@@ -563,7 +565,7 @@ fn scale_krpkr(pos: &Position, strong_side: Color) -> ScaleFactor {
     // defending king and the defending king cannot gain tempi by
     // threatening the attacking rook.
     if r == RANK_7
-        && f != FILE_H
+        && f != FILE_A
         && wrsq.file() == f
         && wrsq != queening_sq
         && Square::distance(wksq, queening_sq) + 2 <
@@ -571,9 +573,8 @@ fn scale_krpkr(pos: &Position, strong_side: Color) -> ScaleFactor {
         && Square::distance(wksq, queening_sq) <
             Square::distance(bksq, wrsq) + tempo
     {
-        return
-            ScaleFactor(ScaleFactor::MAX.0
-                - 2 * Square::distance(wksq, queening_sq) as i32);
+        return ScaleFactor(ScaleFactor::MAX.0
+            - 2 * Square::distance(wksq, queening_sq) as i32);
     }
 
     // Similar to the above, but with the pawn further back
@@ -590,10 +591,9 @@ fn scale_krpkr(pos: &Position, strong_side: Color) -> ScaleFactor {
                 && Square::distance(wksq, wpsq + NORTH) <
                     Square::distance(bksq, wrsq) + tempo))
     {
-        return
-            ScaleFactor(ScaleFactor::MAX.0
-                - 8 * Square::distance(wpsq, queening_sq) as i32
-                - 2 * Square::distance(wksq, queening_sq) as i32);
+        return ScaleFactor(ScaleFactor::MAX.0
+            - 8 * Square::distance(wpsq, queening_sq) as i32
+            - 2 * Square::distance(wksq, queening_sq) as i32);
     }
 
     // If the pawn is not far advanced and the defending king is somewhere
