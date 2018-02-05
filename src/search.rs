@@ -464,14 +464,12 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
             if pos.root_moves[pos.pv_idx].tb_rank.abs() > 1000 {
                 best_value = pos.root_moves[pos.pv_idx].tb_score;
                 pos.root_moves[pos.pv_idx].score = best_value;
-                alpha = -Value::INFINITE;
-                beta = Value::INFINITE;
                 if pos.is_main
-                    && (threads::stop()
-                        || pos.pv_idx + 1 == multi_pv
+                    && (threads::stop() || pos.pv_idx + 1 == multi_pv
                         || timeman::elapsed() > 3000)
                 {
-                    print_pv(pos, root_depth, alpha, beta);
+                    print_pv(pos, root_depth, -Value::INFINITE,
+                        Value::INFINITE);
                 }
                 pos.pv_idx += 1;
                 continue;
@@ -489,8 +487,8 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
             }
 
             // Start with a small aspiration window and, in the case of a fail
-            // high/low, re-search with a bigger window until we're not failing
-            // high/low anymore.
+            // high/low, re-search with a bigger window until we're no longer
+            // failing high/low.
             loop {
                 best_value = search::<Pv>(pos, &mut stack, alpha, beta,
                     root_depth, false, false);
@@ -500,13 +498,13 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                 // sorting is done with a stable sort algorithm because all
                 // the values but the first and eventually the new best one
                 // are set to -Value::INFINITE and we want to keep the same
-                // orer for all the mvoes except the new PV that goes to the
+                // orer for all the moves except the new PV that goes to the
                 // front. Note that in case of MultiPV search the PV lines
                 // already searched are preserved.
                 pos.root_moves[pos.pv_idx..].sort();
 
                 // If search has been stopped, we break immediately. Sorting
-                // and writing PV back to TT is safe because root_moves is
+                // and writing the PV back to TT is safe because root_moves is
                 // still valid, although it refers to the previous iteration.
                 if threads::stop() {
                     break;
@@ -574,7 +572,7 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
             threads::set_stop(true);
         }
 
-        if pos.is_main {
+        if !pos.is_main {
             continue;
         }
 
@@ -593,8 +591,8 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                     && limits().time[us.0 as usize] - timeman::elapsed() >
                         limits().time[(!us).0 as usize]
                     && pv_is_draw(pos);
-                let mut unstable_pv_factor = 1.0f64 + pos.best_move_changes
-                    + (if think_hard { 1.0f64 } else { 0.0f64 });
+                let mut unstable_pv_factor = 1. + pos.best_move_changes
+                    + (if think_hard { 1. } else { 0. });
 
                 // if the best_move is stable over several iterations, reduce
                 // time for this move, the longer the move has been stable,
@@ -609,6 +607,7 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                     }
                     unstable_pv_factor *=
                         pos.previous_time_reduction.powf(0.51) / time_reduction;
+
                     if pos.root_moves.len() == 1
                         || (timeman::elapsed() as f64) >
                             (timeman::optimum() as f64) *
@@ -630,7 +629,7 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
 
     }
 
-    if pos.is_main {
+    if !pos.is_main {
         return;
     }
 
@@ -1005,10 +1004,9 @@ fn search<NT: NodeType>(
     let mut value = best_value;
 
     let improving = ss[5].static_eval >= ss[3].static_eval
-                    || ss[3].static_eval == Value::NONE;
+        || ss[3].static_eval == Value::NONE;
 
-    let singular_extension_node =
-        !root_node
+    let singular_extension_node = !root_node
         && depth >= 8 * ONE_PLY
         && tt_move != Move::NONE
         && tt_value != Value::NONE
@@ -1073,8 +1071,7 @@ fn search<NT: NodeType>(
                 pos.gives_check(m)
             };
 
-        let move_count_pruning =
-            depth < 16 *ONE_PLY
+        let move_count_pruning = depth < 16 *ONE_PLY
             && move_count >= futility_move_counts(improving, depth);
 
         // Step 12. Singular and Gives Check Extensions
@@ -1100,8 +1097,8 @@ fn search<NT: NodeType>(
                 extension = ONE_PLY;
             }
         } else if gives_check
-                    && !move_count_pruning
-                    && pos.see_ge(m, Value::ZERO)
+            && !move_count_pruning
+            && pos.see_ge(m, Value::ZERO)
         {
             extension = ONE_PLY;
         }
@@ -1256,19 +1253,18 @@ fn search<NT: NodeType>(
 
         // Step 16. Full depth search if LMR is skipped or fails high
         if do_full_depth_search {
-            value =
-                if new_depth < ONE_PLY {
-                    if gives_check {
-                        -qsearch::<NonPv, True>(pos, &mut ss[1..], -(alpha+1),
-                            -alpha, Depth::ZERO)
-                    } else {
-                        -qsearch::<NonPv, False>(pos, &mut ss[1..], -(alpha+1),
-                            -alpha, Depth::ZERO)
-                    }
+            value = if new_depth < ONE_PLY {
+                if gives_check {
+                    -qsearch::<NonPv, True>(pos, &mut ss[1..], -(alpha+1),
+                        -alpha, Depth::ZERO)
                 } else {
-                    -search::<NonPv>(pos, &mut ss[1..], -(alpha+1), -alpha,
-                        new_depth, !cut_node, false)
-                };
+                    -qsearch::<NonPv, False>(pos, &mut ss[1..], -(alpha+1),
+                        -alpha, Depth::ZERO)
+                }
+            } else {
+                -search::<NonPv>(pos, &mut ss[1..], -(alpha+1), -alpha,
+                    new_depth, !cut_node, false)
+            }
         }
 
         // For PV nodes only, do a full PV search on the first move or after a
@@ -1281,19 +1277,18 @@ fn search<NT: NodeType>(
         {
             ss[6].pv.truncate(0);
 
-            value =
-                if new_depth < ONE_PLY {
-                    if gives_check {
-                        -qsearch::<Pv, True>(pos, &mut ss[1..], -beta, -alpha,
-                            Depth::ZERO)
-                    } else {
-                        -qsearch::<Pv, False>(pos, &mut ss[1..], -beta, -alpha,
-                            Depth::ZERO)
-                    }
+            value = if new_depth < ONE_PLY {
+                if gives_check {
+                    -qsearch::<Pv, True>(pos, &mut ss[1..], -beta, -alpha,
+                        Depth::ZERO)
                 } else {
-                    -search::<Pv>(pos, &mut ss[1..], -beta, -alpha, new_depth,
-                        false, false)
-                };
+                    -qsearch::<Pv, False>(pos, &mut ss[1..], -beta, -alpha,
+                        Depth::ZERO)
+                }
+            } else {
+                -search::<Pv>(pos, &mut ss[1..], -beta, -alpha, new_depth,
+                    false, false)
+            }
         }
 
         // Step 17. Undo move
@@ -1310,9 +1305,8 @@ fn search<NT: NodeType>(
         }
 
         if root_node {
-            let rm = pos.root_moves
-                .iter_mut()
-                .find(|ref rm| rm.pv[0] == m).unwrap();
+            let rm = pos.root_moves.iter_mut().find(|ref rm| rm.pv[0] == m)
+                .unwrap();
 
             // PV move or new best move?
             if move_count == 1 || value > alpha {
@@ -1368,15 +1362,14 @@ fn search<NT: NodeType>(
     }
 
     // Step 20. Check for mate and stalemante
-    // All legal mvoes have been searched and if there are no legal moves, it
+    // All legal moves have been searched and if there are no legal moves, it
     // must be a mate or a stalemate. If we are in a singular extension search,
     // then return a fail low score.
 
     if move_count == 0 {
-        best_value =
-            if excluded_move != Move::NONE { alpha }
+        best_value = if excluded_move != Move::NONE { alpha }
             else if in_check { mated_in(ss[5].ply) }
-            else { Value::DRAW };
+            else { Value::DRAW }
     } else if best_move != Move::NONE {
         // Quiet best move: update move sorting heuristics
         if !pos.capture_or_promotion(best_move) {
@@ -1396,8 +1389,8 @@ fn search<NT: NodeType>(
     }
     // Bonus for prior countermove that caused the fail low
     else if depth >= 3 * ONE_PLY
-                && pos.captured_piece() == NO_PIECE
-                && ss[4].current_move.is_ok()
+        && pos.captured_piece() == NO_PIECE
+        && ss[4].current_move.is_ok()
     {
         update_continuation_histories(ss, pos.piece_on(prev_sq), prev_sq,
             stat_bonus(depth));
@@ -1452,7 +1445,7 @@ fn qsearch<NT: NodeType, InCheck: Bool> (
     // Check for an instant draw or if maximum ply count has been reached
     if pos.is_draw(ss[5].ply) || ss[5].ply >= MAX_PLY {
         return if ss[5].ply >= MAX_PLY && !in_check { evaluate(pos) }
-               else { Value::DRAW };
+            else { Value::DRAW };
     }
 
     debug_assert!(0 <= ss[5].ply && ss[5].ply < MAX_PLY);
@@ -1460,25 +1453,21 @@ fn qsearch<NT: NodeType, InCheck: Bool> (
     // Decide whether or not to include checks: this fixes also the type of
     // TT entry depth that we are going to use. Note that in qsearch we use
     // only two types of depth in TT: DEPTH_QS_CHECKS or DEPTH_QS_NO_CHECKS.
-    let tt_depth =
-        if in_check || depth >= Depth::QS_CHECKS { Depth::QS_CHECKS }
+    let tt_depth = if in_check || depth >= Depth::QS_CHECKS { Depth::QS_CHECKS }
         else { Depth::QS_NO_CHECKS };
     // Transposition table lookup
     let pos_key = pos.key();
     let (tte, tt_hit) = tt::probe(pos_key);
     let tt_move = if tt_hit { tte.mov() } else { Move::NONE };
-    let tt_value = if tt_hit {
-        value_from_tt(tte.value(), ss[5].ply)
-    } else {
-        Value::NONE
-    };
+    let tt_value = if tt_hit { value_from_tt(tte.value(), ss[5].ply) }
+        else { Value::NONE };
 
     if !pv_node
         && tt_hit
         && tte.depth() >= tt_depth
         && tt_value != Value::NONE // Only in case of TT access race
         && (if tt_value >= beta { tte.bound() & Bound::LOWER != 0 }
-                           else { tte.bound() & Bound::UPPER != 0 })
+            else { tte.bound() & Bound::UPPER != 0 })
     {
         return tt_value;
     }
@@ -1510,12 +1499,8 @@ fn qsearch<NT: NodeType, InCheck: Bool> (
                 best_value = tmp;
             }
         } else {
-            best_value =
-                if ss[4].current_move != Move::NULL {
-                    evaluate(pos)
-                } else {
-                    -ss[4].static_eval + 2 * evaluate::TEMPO
-                };
+            best_value = if ss[4].current_move != Move::NULL { evaluate(pos) }
+                else { -ss[4].static_eval + 2 * evaluate::TEMPO };
             ss[5].static_eval = best_value;
         }
 
@@ -1586,8 +1571,7 @@ fn qsearch<NT: NodeType, InCheck: Bool> (
         }
 
         // Detect non-capture evasions that are candidates to be pruned
-        let evasion_prunable =
-            in_check
+        let evasion_prunable = in_check
             && (depth != Depth::ZERO || move_count > 2)
             && best_value > Value::MATED_IN_MAX_PLY
             && !pos.capture(m);
@@ -1655,8 +1639,7 @@ fn qsearch<NT: NodeType, InCheck: Bool> (
         tt_depth, best_move, ss[5].static_eval, tt::generation());
 
     debug_assert!(
-        best_value > -Value::INFINITE && best_value < Value::INFINITE
-    );
+        best_value > -Value::INFINITE && best_value < Value::INFINITE);
 
     return best_value;
 }
@@ -1668,13 +1651,9 @@ fn qsearch<NT: NodeType, InCheck: Bool> (
 fn value_to_tt(v: Value, ply: i32) -> Value {
     debug_assert!(v != Value::NONE);
 
-    if v >= Value::MATE_IN_MAX_PLY {
-        v + ply
-    } else if v <= Value::MATED_IN_MAX_PLY {
-        v - ply
-    } else {
-        v
-    }
+    if v >= Value::MATE_IN_MAX_PLY { v + ply }
+    else if v <= Value::MATED_IN_MAX_PLY { v - ply }
+    else { v }
 }
 
 // value_from_tt() is the inverse of value_to_tt(). It adjusts a mate score
@@ -1682,15 +1661,10 @@ fn value_to_tt(v: Value, ply: i32) -> Value {
 // from current position) to "plies to mate/be mated from the root".
 
 fn value_from_tt(v: Value, ply: i32) -> Value {
-    if v == Value::NONE {
-        Value::NONE
-    } else if v >= Value::MATE_IN_MAX_PLY {
-        v - ply
-    } else if v <= Value::MATED_IN_MAX_PLY {
-        v + ply
-    } else {
-        v
-    }
+    if v == Value::NONE { Value::NONE }
+    else if v >= Value::MATE_IN_MAX_PLY { v - ply }
+    else if v <= Value::MATED_IN_MAX_PLY { v + ply }
+    else { v }
 }
 
 // update_pv() adds current move and appends child pv

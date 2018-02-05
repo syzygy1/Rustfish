@@ -175,6 +175,7 @@ fn run_thread(idx: usize, tx: Sender<Arc<ThreadCtrl>>) {
     let th = Arc::new(ThreadCtrl::new(idx));
     tx.send(th.clone()).unwrap();
     pos.thread_ctrl = Some(th.clone());
+    pos.previous_time_reduction = 1.;
     pos.cont_history.init();
 
     loop {
