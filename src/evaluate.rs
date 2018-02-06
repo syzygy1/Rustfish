@@ -209,8 +209,8 @@ const SPACE_THRESHOLD: Value = Value(12222);
 // initialize() computes king and pawn attacks and the king ring bitboard
 // for a given color. This is done at the beginning of the evaluation.
 
-fn initialize<C: ColorTrait>(pos: &Position, ei: &mut EvalInfo) {
-    let us = C::color();
+fn initialize<Us: ColorTrait>(pos: &Position, ei: &mut EvalInfo) {
+    let us = Us::COLOR;
     let them = if us == WHITE { BLACK } else { WHITE };
     let up   = if us == WHITE { NORTH } else { SOUTH };
     let down = if us == WHITE { SOUTH } else { NORTH };
@@ -255,11 +255,11 @@ fn initialize<C: ColorTrait>(pos: &Position, ei: &mut EvalInfo) {
 // evaluate_pieces() assigned bonuses and penalties to the pieces of a given
 // color and type.
 
-fn evaluate_pieces<C: ColorTrait, Pt: PieceTypeTrait> (
+fn evaluate_pieces<Us: ColorTrait, Pt: PieceTypeTrait> (
     pos: &Position, ei: &mut EvalInfo
 ) -> Score {
-    let us = C::color();
-    let pt = Pt::piece_type();
+    let us = Us::COLOR;
+    let pt = Pt::TYPE;
     let them = if us == WHITE { BLACK } else { WHITE };
     let outpost_ranks =
         if us == WHITE { RANK4_BB | RANK5_BB | RANK6_BB }
@@ -426,8 +426,8 @@ fn evaluate_pieces<C: ColorTrait, Pt: PieceTypeTrait> (
 
 // evaluate_king() assigns bonuses and penalties to a king of a given color
 
-fn evaluate_king<C: ColorTrait>(pos: &Position, ei: &mut EvalInfo) -> Score {
-    let us = C::color();
+fn evaluate_king<Us: ColorTrait>(pos: &Position, ei: &mut EvalInfo) -> Score {
+    let us = Us::COLOR;
     let them = if us == WHITE { BLACK } else { WHITE };
     let camp = if us == WHITE { ALL_SQUARES ^ RANK6_BB ^ RANK7_BB ^ RANK8_BB }
                else           { ALL_SQUARES ^ RANK1_BB ^ RANK2_BB ^ RANK3_BB };
@@ -435,7 +435,7 @@ fn evaluate_king<C: ColorTrait>(pos: &Position, ei: &mut EvalInfo) -> Score {
     let ksq = pos.square(us, KING);
 
     // King shelter and enemy pawns storm
-    let mut score = ei.pe.king_safety::<C>(pos, ksq);
+    let mut score = ei.pe.king_safety::<Us>(pos, ksq);
 
     // Main king safety evaluation
     if ei.king_attackers_count[them.0 as usize] >
@@ -547,8 +547,8 @@ fn evaluate_king<C: ColorTrait>(pos: &Position, ei: &mut EvalInfo) -> Score {
     score
 }
 
-fn evaluate_threats<C: ColorTrait>(pos: &Position, ei: &EvalInfo) -> Score {
-    let us = C::color();
+fn evaluate_threats<Us: ColorTrait>(pos: &Position, ei: &EvalInfo) -> Score {
+    let us = Us::COLOR;
     let them     = if us == WHITE { BLACK      } else { WHITE };
     let up       = if us == WHITE { NORTH      } else { SOUTH };
     let left     = if us == WHITE { NORTH_WEST } else { SOUTH_EAST };
@@ -662,10 +662,10 @@ fn capped_distance(s1: Square, s2: Square) -> i32 {
 // evaluate_passed_pawns() evaluates the passed pawns and candidate passed
 // pawns of the given color.
 
-fn evaluate_passed_pawns<C: ColorTrait>(
+fn evaluate_passed_pawns<Us: ColorTrait>(
     pos: &Position, ei: &EvalInfo
 ) -> Score {
-    let us = C::color();
+    let us = Us::COLOR;
     let them = if us == WHITE { BLACK } else { WHITE };
     let up   = if us == WHITE { NORTH } else { SOUTH };
 
@@ -771,8 +771,8 @@ fn evaluate_passed_pawns<C: ColorTrait>(
 // the space bonus is multiplied by a weight. The aim is to improve play on
 // game opening.
 
-fn evaluate_space<C: ColorTrait>(pos: &Position, ei: &EvalInfo) -> Score {
-    let us = C::color();
+fn evaluate_space<Us: ColorTrait>(pos: &Position, ei: &EvalInfo) -> Score {
+    let us = Us::COLOR;
     let them = if us == WHITE { BLACK } else { WHITE };
     let space_mask = if us == WHITE {
         CENTER_FILES & (RANK2_BB | RANK3_BB | RANK4_BB)

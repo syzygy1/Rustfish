@@ -146,19 +146,16 @@ pub fn limits() -> &'static mut LimitsType {
 struct NonPv;
 struct Pv;
 
-const NON_PV: usize = 0;
-const PV: usize = 1;
-
 trait NodeType {
-    fn node_type() -> usize;
+    const NT: usize;
 }
 
 impl NodeType for NonPv {
-    fn node_type() -> usize { NON_PV }
+    const NT: usize = 0;
 }
 
 impl NodeType for Pv {
-    fn node_type() -> usize { PV }
+    const NT: usize = 1;
 }
 
 // Sizes and phases of the skip blocks, used for distributing search depths
@@ -182,7 +179,7 @@ static mut REDUCTIONS: [[[[i32; 64]; 64]; 2]; 2] = [[[[0; 64]; 64]; 2]; 2];
 
 fn reduction<PvNode: NodeType>(i: bool, d: Depth, mn: i32) -> Depth {
     unsafe {
-        REDUCTIONS[PvNode::node_type()][i as usize]
+        REDUCTIONS[PvNode::NT][i as usize]
             [std::cmp::min(d / ONE_PLY, 63) as usize]
             [std::cmp::min(mn, 63) as usize] * ONE_PLY
     }
@@ -206,7 +203,7 @@ fn perft<Root: Bool>(pos: &mut Position, depth: Depth) -> u64 {
 
     for m in MoveList::new::<Legal>(pos) {
         let cnt;
-        if Root::bool() && depth <= ONE_PLY {
+        if Root::BOOL && depth <= ONE_PLY {
             cnt = 1;
             nodes += 1;
         } else {
@@ -217,7 +214,7 @@ fn perft<Root: Bool>(pos: &mut Position, depth: Depth) -> u64 {
             nodes += cnt;
             pos.undo_move(m);
         }
-        if Root::bool() {
+        if Root::BOOL {
             println!("{}: {}", uci::move_str(m, pos.is_chess960()), cnt);
             stdout().flush().unwrap();
         }
@@ -234,14 +231,14 @@ pub fn init() {
                 for mc in 1..64 {
                     let r = (d as f64).ln() * (mc as f64).ln() / 1.95;
 
-                    REDUCTIONS[NON_PV][imp][d][mc] = r.round() as i32;
-                    REDUCTIONS[PV][imp][d][mc] = std::cmp::max(
-                        REDUCTIONS[NON_PV][imp][d][mc] - 1, 0);
+                    REDUCTIONS[NonPv::NT][imp][d][mc] = r.round() as i32;
+                    REDUCTIONS[Pv::NT][imp][d][mc] = std::cmp::max(
+                        REDUCTIONS[NonPv::NT][imp][d][mc] - 1, 0);
 
                     if imp == 0
-                        && REDUCTIONS[NON_PV][imp][d][mc] >= 2
+                        && REDUCTIONS[NonPv::NT][imp][d][mc] >= 2
                     {
-                        REDUCTIONS[NON_PV][imp][d][mc] += 1;
+                        REDUCTIONS[NonPv::NT][imp][d][mc] += 1;
                     }
                 }
             }
@@ -642,8 +639,7 @@ fn search<NT: NodeType>(
     pos: &mut Position, ss: &mut [Stack], mut alpha: Value, mut beta: Value,
     depth: Depth, cut_node: bool, skip_early_pruning: bool
 ) -> Value {
-    let nt = NT::node_type();
-    let pv_node = nt == PV;
+    let pv_node = NT::NT == Pv::NT;
     let root_node = pv_node && ss[5].ply == 0;
 
     debug_assert!(-Value::INFINITE <= alpha && alpha < beta
@@ -1421,9 +1417,8 @@ fn qsearch<NT: NodeType, InCheck: Bool> (
     pos: &mut Position, ss: &mut [Stack], mut alpha: Value, beta: Value,
     depth: Depth
 ) -> Value {
-    let nt = NT::node_type();
-    let in_check = InCheck::bool();
-    let pv_node = nt == PV;
+    let in_check = InCheck::BOOL;
+    let pv_node = NT::NT == Pv::NT;
 
     debug_assert!(in_check == (pos.checkers() != 0));
     debug_assert!(alpha >= -Value::INFINITE

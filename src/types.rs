@@ -58,19 +58,19 @@ pub struct Black;
 pub trait ColorTrait {
     type KingSide: CastlingRightTrait;
     type QueenSide: CastlingRightTrait;
-    fn color() -> Color;
+    const COLOR: Color;
 }
 
 impl ColorTrait for White {
     type KingSide = WhiteOO;
     type QueenSide = WhiteOOO;
-    fn color() -> Color { WHITE }
+    const COLOR: Color = WHITE;
 }
 
 impl ColorTrait for Black {
     type KingSide = BlackOO;
     type QueenSide = BlackOOO;
-    fn color() -> Color { BLACK }
+    const COLOR: Color = BLACK;
 }
 
 #[allow(non_camel_case_types)]
@@ -91,7 +91,7 @@ pub const BLACK_OOO   : CastlingRight = CastlingRight(8);
 pub const ANY_CASTLING: CastlingRight = CastlingRight(15);
 
 pub trait CastlingRightTrait {
-    fn castling_right() -> CastlingRight;
+    const CR: CastlingRight;
 }
 
 pub struct WhiteOO;
@@ -100,19 +100,19 @@ pub struct BlackOO;
 pub struct BlackOOO;
 
 impl CastlingRightTrait for WhiteOO {
-    fn castling_right() -> CastlingRight { WHITE_OO }
+    const CR: CastlingRight = WHITE_OO;
 }
 
 impl CastlingRightTrait for WhiteOOO {
-    fn castling_right() -> CastlingRight { WHITE_OOO }
+    const CR: CastlingRight = WHITE_OOO;
 }
 
 impl CastlingRightTrait for BlackOO {
-    fn castling_right() -> CastlingRight { BLACK_OO }
+    const CR: CastlingRight = BLACK_OO;
 }
 
 impl CastlingRightTrait for BlackOOO {
-    fn castling_right() -> CastlingRight { BLACK_OOO }
+    const CR: CastlingRight = BLACK_OOO;
 }
 
 impl CastlingRight {
@@ -234,31 +234,31 @@ pub struct Queen;
 pub struct King;
 
 pub trait PieceTypeTrait {
-    fn piece_type() -> PieceType;
+    const TYPE: PieceType;
 }
 
 impl PieceTypeTrait for Pawn {
-    fn piece_type() -> PieceType { PAWN }
+    const TYPE: PieceType = PAWN;
 }
 
 impl PieceTypeTrait for Knight {
-    fn piece_type() -> PieceType { KNIGHT }
+    const TYPE: PieceType = KNIGHT;
 }
 
 impl PieceTypeTrait for Bishop {
-    fn piece_type() -> PieceType { BISHOP }
+    const TYPE: PieceType = BISHOP;
 }
 
 impl PieceTypeTrait for Rook {
-    fn piece_type() -> PieceType { ROOK }
+    const TYPE: PieceType = ROOK;
 }
 
 impl PieceTypeTrait for Queen {
-    fn piece_type() -> PieceType { QUEEN }
+    const TYPE: PieceType = QUEEN;
 }
 
 impl PieceTypeTrait for King {
-    fn piece_type() -> PieceType { KING }
+    const TYPE: PieceType = KING;
 }
 
 
@@ -859,13 +859,13 @@ pub struct True {}
 pub struct False {}
 
 pub trait Bool {
-    fn bool() -> bool;
+    const BOOL: bool;
 }
 
 impl Bool for True {
-    fn bool() -> bool { true }
+    const BOOL: bool = true;
 }
 
 impl Bool for False {
-    fn bool() -> bool { false }
+    const BOOL: bool = false;
 }

@@ -20,37 +20,37 @@ pub struct Legal;
 
 pub trait GenType {
     type Checks: Bool;
-    fn gen_type() -> i32;
+    const TYPE: i32;
 }
 
 impl GenType for Captures {
     type Checks = False;
-    fn gen_type() -> i32 { CAPTURES }
+    const TYPE: i32 = CAPTURES;
 }
 
 impl GenType for Quiets {
     type Checks = False;
-    fn gen_type() -> i32 { QUIETS }
+    const TYPE: i32 = QUIETS;
 }
 
 impl GenType for QuietChecks {
     type Checks = True;
-    fn gen_type() -> i32 { QUIET_CHECKS }
+    const TYPE: i32 = QUIET_CHECKS;
 }
 
 impl GenType for Evasions {
     type Checks = False;
-    fn gen_type() -> i32 { EVASIONS }
+    const TYPE: i32 = EVASIONS;
 }
 
 impl GenType for NonEvasions {
     type Checks = False;
-    fn gen_type() -> i32 { NON_EVASIONS }
+    const TYPE: i32 = NON_EVASIONS;
 }
 
 impl GenType for Legal {
     type Checks = False;
-    fn gen_type() -> i32 { LEGAL }
+    const TYPE: i32 = LEGAL;
 }
 
 #[derive(Clone, Copy)]
@@ -77,7 +77,7 @@ impl MoveList {
         };
         { // we need to borrow "moves"
             let mut list: &mut [ExtMove] = &mut moves.list;
-            moves.num = match T::gen_type() {
+            moves.num = match T::TYPE {
                 CAPTURES     => generate::<Captures   >(pos, &mut list, 0),
                 QUIETS       => generate::<Quiets     >(pos, &mut list, 0),
                 QUIET_CHECKS => generate::<QuietChecks>(pos, &mut list, 0),
@@ -118,29 +118,26 @@ impl Iterator for MoveList {
     }
 }
 
-fn generate_castling<CR: CastlingRightTrait, C: Bool, C960: Bool>(
+fn generate_castling<Cr: CastlingRightTrait, Checks: Bool, Chess960: Bool>(
     pos: &Position, list: &mut [ExtMove], idx: usize, us: Color
 ) -> usize {
-    let cr = CR::castling_right();
-    let checks = C::bool();
-    let chess960 = C960::bool();
-    let king_side = cr == WHITE_OO || cr == BLACK_OO;
+    let king_side = Cr::CR == WHITE_OO || Cr::CR == BLACK_OO;
 
-    if pos.castling_impeded(cr) || !pos.has_castling_right(cr) {
+    if pos.castling_impeded(Cr::CR) || !pos.has_castling_right(Cr::CR) {
         return idx;
     }
 
     // After castling, the rook and king final positions are the same in
     // Chess960 as they are in standard chess.
     let kfrom = pos.square(us, KING);
-    let rfrom = pos.castling_rook_square(cr);
+    let rfrom = pos.castling_rook_square(Cr::CR);
     let kto =
         relative_square(us, if king_side { Square::G1 } else { Square::C1 });
     let enemies = pos.pieces_c(!us);
 
     debug_assert!(pos.checkers() == 0);
 
-    let direction = match chess960 {
+    let direction = match Chess960::BOOL {
         true  => if kto > kfrom { WEST } else { EAST },
         false => if king_side { WEST } else { EAST },
     };
@@ -156,7 +153,7 @@ fn generate_castling<CR: CastlingRightTrait, C: Bool, C960: Bool>(
     // Because we generate only legal castling moves, we need to verify that
     // when moving the castling rook we do not discover some hidden checker.
     // For instance an enemy queen on A1 when the castling rook is on B1.
-    if chess960
+    if Chess960::BOOL
         && attacks_bb(ROOK, kto, pos.pieces() ^ rfrom)
             & pos.pieces_cpp(!us, ROOK, QUEEN) != 0
     {
@@ -165,7 +162,7 @@ fn generate_castling<CR: CastlingRightTrait, C: Bool, C960: Bool>(
 
     let m = Move::make_special(CASTLING, kfrom, rfrom);
 
-    if checks && !pos.gives_check(m) {
+    if Checks::BOOL && !pos.gives_check(m) {
         return idx;
     }
 
@@ -173,21 +170,17 @@ fn generate_castling<CR: CastlingRightTrait, C: Bool, C960: Bool>(
     idx + 1
 }
 
-//fn make_promotions<T: GenType, D: DirectionTrait>(
 fn make_promotions<T: GenType>(
     list: &mut [ExtMove], mut idx: usize, to: Square, ksq: Square,
     direction: Direction
 ) -> usize {
-    let gen_type = T::gen_type();
-//    let direction = D::direction();
-
-    if gen_type == CAPTURES || gen_type == EVASIONS || gen_type == NON_EVASIONS
+    if T::TYPE == CAPTURES || T::TYPE == EVASIONS || T::TYPE == NON_EVASIONS
     {
         list[idx].m = Move::make_prom(to - direction, to, QUEEN);
         idx += 1;
     }
 
-    if gen_type == QUIETS || gen_type == EVASIONS || gen_type == NON_EVASIONS
+    if T::TYPE == QUIETS || T::TYPE == EVASIONS || T::TYPE == NON_EVASIONS
     {
         list[idx    ].m = Move::make_prom(to - direction, to, ROOK);
         list[idx + 1].m = Move::make_prom(to - direction, to, BISHOP);
@@ -197,7 +190,7 @@ fn make_promotions<T: GenType>(
 
     // Knight promotion is the only promotion that can give a direct check
     // that's not already included in the queen promotion.
-    if gen_type == QUIET_CHECKS && pseudo_attacks(KNIGHT, to) & ksq != 0 {
+    if T::TYPE == QUIET_CHECKS && pseudo_attacks(KNIGHT, to) & ksq != 0 {
         list[idx].m = Move::make_prom(to - direction, to, KNIGHT);
         idx += 1;
     }
@@ -206,11 +199,10 @@ fn make_promotions<T: GenType>(
 }
 
 // template us
-fn generate_pawn_moves<C: ColorTrait, T: GenType>(
+fn generate_pawn_moves<Us: ColorTrait, T: GenType>(
     pos: &Position, list: &mut [ExtMove], mut idx: usize, target: Bitboard
 ) -> usize {
-    let us = C::color();
-    let gen_type = T::gen_type();
+    let us = Us::COLOR;
     let them = !us;
     let trank_8bb = if us == WHITE { RANK8_BB } else { RANK1_BB };
     let trank_7bb = if us == WHITE { RANK7_BB } else { RANK2_BB };
@@ -224,16 +216,16 @@ fn generate_pawn_moves<C: ColorTrait, T: GenType>(
     let pawns_on_7     = pos.pieces_cp(us, PAWN) &  trank_7bb; 
     let pawns_not_on_7 = pos.pieces_cp(us, PAWN) & !trank_7bb;
 
-    let enemies = match gen_type {
+    let enemies = match T::TYPE {
         EVASIONS => pos.pieces_c(them) & target,
         CAPTURES => target,
         _        => pos.pieces_c(them)
     };
 
     // Single and double pawn pushes, no promotions
-    if gen_type != CAPTURES {
+    if T::TYPE != CAPTURES {
         empty_squares =
-            if gen_type == QUIETS || gen_type == QUIET_CHECKS {
+            if T::TYPE == QUIETS || T::TYPE == QUIET_CHECKS {
                 target
             } else {
                 !pos.pieces()
@@ -242,12 +234,12 @@ fn generate_pawn_moves<C: ColorTrait, T: GenType>(
         let mut b1 = pawns_not_on_7.shift(up) & empty_squares;
         let mut b2 = (b1 & trank_3bb).shift(up) & empty_squares;
 
-        if gen_type == EVASIONS { // Consider only blocking squares
+        if T::TYPE == EVASIONS { // Consider only blocking squares
             b1 &= target;
             b2 &= target;
         }
 
-        if gen_type == QUIET_CHECKS {
+        if T::TYPE == QUIET_CHECKS {
             let ksq = pos.square(them, KING);
 
             b1 &= pos.attacks_from_pawn(ksq, them);
@@ -283,12 +275,12 @@ fn generate_pawn_moves<C: ColorTrait, T: GenType>(
     }
 
     // Promotions and underpromotions
-    if pawns_on_7 != 0 && (gen_type != EVASIONS || target & trank_8bb != 0) {
-        if gen_type == CAPTURES {
+    if pawns_on_7 != 0 && (T::TYPE != EVASIONS || target & trank_8bb != 0) {
+        if T::TYPE == CAPTURES {
             empty_squares = !pos.pieces();
         }
 
-        if gen_type == EVASIONS {
+        if T::TYPE == EVASIONS {
             empty_squares &= target;
         }
 
@@ -312,7 +304,7 @@ fn generate_pawn_moves<C: ColorTrait, T: GenType>(
     }
 
     // Standard and en-passant captures
-    if gen_type == CAPTURES || gen_type == EVASIONS || gen_type == NON_EVASIONS
+    if T::TYPE == CAPTURES || T::TYPE == EVASIONS || T::TYPE == NON_EVASIONS
     {
         let b1 = pawns_not_on_7.shift(right) & enemies;
         let b2 = pawns_not_on_7.shift(left ) & enemies;
@@ -334,7 +326,7 @@ fn generate_pawn_moves<C: ColorTrait, T: GenType>(
             // piece is the double pushed pawn and so is in the target.
             // Otherwise this is a discovery check and we are forced to do
             // otherwise.
-            if gen_type == EVASIONS && target & (pos.ep_square() - up) == 0 {
+            if T::TYPE == EVASIONS && target & (pos.ep_square() - up) == 0 {
                 return idx;
             }
 
@@ -354,19 +346,17 @@ fn generate_pawn_moves<C: ColorTrait, T: GenType>(
     idx
 }
 
-fn generate_moves<PT: PieceTypeTrait, C: Bool>(
+fn generate_moves<Pt: PieceTypeTrait, Checks: Bool>(
     pos: &Position, list: &mut [ExtMove], mut idx: usize, us: Color,
     target: Bitboard
 ) -> usize {
-    let pt = PT::piece_type();
-    let checks = C::bool();
-    debug_assert!(pt != KING && pt != PAWN);
+    debug_assert!(Pt::TYPE != KING && Pt::TYPE != PAWN);
 
-    for from in pos.square_list(us, pt) {
-        if checks {
-            if (pt == BISHOP || pt == ROOK || pt == QUEEN)
-                && pseudo_attacks(pt, from) & target
-                    & pos.check_squares(pt) == 0
+    for from in pos.square_list(us, Pt::TYPE) {
+        if Checks::BOOL {
+            if (Pt::TYPE == BISHOP || Pt::TYPE == ROOK || Pt::TYPE == QUEEN)
+                && pseudo_attacks(Pt::TYPE, from) & target
+                    & pos.check_squares(Pt::TYPE) == 0
             {
                 continue;
             }
@@ -376,10 +366,10 @@ fn generate_moves<PT: PieceTypeTrait, C: Bool>(
             }
         }
 
-        let mut b = pos.attacks_from(pt, from) & target;
+        let mut b = pos.attacks_from(Pt::TYPE, from) & target;
 
-        if checks {
-            b &= pos.check_squares(pt);
+        if Checks::BOOL {
+            b &= pos.check_squares(Pt::TYPE);
         }
 
         for to in b {
@@ -391,19 +381,18 @@ fn generate_moves<PT: PieceTypeTrait, C: Bool>(
     idx
 }
 
-fn generate_all<C: ColorTrait, T: GenType>(
+fn generate_all<Us: ColorTrait, T: GenType>(
     pos: &Position, list: &mut [ExtMove], mut idx: usize, target: Bitboard
 ) -> usize {
-    let us = C::color();
-    let gen_type = T::gen_type();
+    let us = Us::COLOR;
 
-    idx = generate_pawn_moves::<C, T>(pos, list, idx, target);
+    idx = generate_pawn_moves::<Us, T>(pos, list, idx, target);
     idx = generate_moves::<Knight, T::Checks>(pos, list, idx, us, target);
     idx = generate_moves::<Bishop, T::Checks>(pos, list, idx, us, target);
     idx = generate_moves::<Rook  , T::Checks>(pos, list, idx, us, target);
     idx = generate_moves::<Queen , T::Checks>(pos, list, idx, us, target);
 
-    if gen_type != QUIET_CHECKS && gen_type != EVASIONS {
+    if T::TYPE != QUIET_CHECKS && T::TYPE != EVASIONS {
         let ksq = pos.square(us, KING);
         let b = pos.attacks_from(KING, ksq) & target;
         for to in b {
@@ -412,16 +401,16 @@ fn generate_all<C: ColorTrait, T: GenType>(
         }
     }
 
-    if gen_type != CAPTURES && gen_type != EVASIONS && pos.can_castle(us) {
+    if T::TYPE != CAPTURES && T::TYPE != EVASIONS && pos.can_castle(us) {
         if pos.is_chess960() {
-            idx = generate_castling::<C::KingSide, T::Checks, True>(pos,
+            idx = generate_castling::<Us::KingSide, T::Checks, True>(pos,
                 list, idx, us);
-            idx = generate_castling::<C::QueenSide, T::Checks, True>(pos,
+            idx = generate_castling::<Us::QueenSide, T::Checks, True>(pos,
                 list, idx, us);
         } else {
-            idx = generate_castling::<C::KingSide, T::Checks, False>(pos,
+            idx = generate_castling::<Us::KingSide, T::Checks, False>(pos,
                 list, idx, us);
-            idx = generate_castling::<C::QueenSide, T::Checks, False>(pos,
+            idx = generate_castling::<Us::QueenSide, T::Checks, False>(pos,
                 list, idx, us);
         }
     }
@@ -554,8 +543,7 @@ fn generate_legal(
 pub fn generate<T: GenType>(
     pos: &Position, list: &mut [ExtMove], idx: usize
 ) -> usize {
-    let gen_type = T::gen_type();
-    match gen_type {
+    match T::TYPE {
         QUIET_CHECKS => generate_quiet_checks(pos, list, idx),
         EVASIONS => generate_evasions(pos, list, idx),
         LEGAL => generate_legal(pos, list, idx),
@@ -564,7 +552,7 @@ pub fn generate<T: GenType>(
 
             let us = pos.side_to_move();
 
-            let target = match gen_type {
+            let target = match T::TYPE {
                 CAPTURES     => pos.pieces_c(!us),
                 QUIETS       => !pos.pieces(),
                 NON_EVASIONS => !pos.pieces_c(us),

@@ -149,15 +149,15 @@ impl Entry {
         self.pawns_on_squares[c.0 as usize][((DARK_SQUARES & s) != 0) as usize]
     }
 
-    pub fn king_safety<C: ColorTrait>(
+    pub fn king_safety<Us: ColorTrait>(
         &mut self, pos: &Position, ksq: Square
     ) -> Score {
-        let us = C::color();
+        let us = Us::COLOR;
         if self.king_squares[us.0 as usize] != ksq
             || self.castling_rights[us.0 as usize] != pos.castling_rights(us)
         {
             self.king_safety[us.0 as usize] =
-                self.do_king_safety::<C>(pos, ksq);
+                self.do_king_safety::<Us>(pos, ksq);
         }
         self.king_safety[us.0 as usize]
     }
@@ -165,10 +165,10 @@ impl Entry {
     // shelter_storm() calculates shelter and storm penalties for the file
     // the king is on, as well as the two closest files.
 
-    fn shelter_storm<C: ColorTrait>(
+    fn shelter_storm<Us: ColorTrait>(
         &self, pos: &Position, ksq: Square
     ) -> Value {
-        let us = C::color();
+        let us = Us::COLOR;
         let them = if us == WHITE { BLACK} else { WHITE };
 
         const BLOCKED_BY_KING: usize = 0;
@@ -211,10 +211,10 @@ impl Entry {
     // when king square changes, which is in about 20% of total king_safety()
     // calls.
 
-    fn do_king_safety<C: ColorTrait>(
+    fn do_king_safety<Us: ColorTrait>(
         &mut self, pos: &Position, ksq: Square
     ) -> Score {
-        let us = C::color();
+        let us = Us::COLOR;
         self.king_squares[us.0 as usize] = ksq;
         self.castling_rights[us.0 as usize] = pos.castling_rights(us);
         let mut min_king_pawn_distance = 0i32;
@@ -227,17 +227,17 @@ impl Entry {
             min_king_pawn_distance += 1;
         }
 
-        let mut bonus = self.shelter_storm::<C>(pos, ksq);
+        let mut bonus = self.shelter_storm::<Us>(pos, ksq);
 
         // If we can castle use the bonus after the castling if it is bigger
         if pos.has_castling_right(us | CastlingSide::KING) {
             bonus = std::cmp::max(bonus,
-                self.shelter_storm::<C>(pos, Square::G1.relative(us)));
+                self.shelter_storm::<Us>(pos, Square::G1.relative(us)));
         }
 
         if pos.has_castling_right(us | CastlingSide::QUEEN) {
             bonus = std::cmp::max(bonus,
-                self.shelter_storm::<C>(pos, Square::C1.relative(us)));
+                self.shelter_storm::<Us>(pos, Square::C1.relative(us)));
         }
 
         Score::make(bonus.0, -16 * min_king_pawn_distance)
@@ -292,8 +292,8 @@ pub fn probe(pos: &Position) -> &mut Entry {
     e
 }
 
-fn evaluate<C: ColorTrait>(pos: &Position, e: &mut Entry) -> Score {
-    let us = C::color();
+fn evaluate<Us: ColorTrait>(pos: &Position, e: &mut Entry) -> Score {
+    let us = Us::COLOR;
     let them  = if us == WHITE { BLACK } else { WHITE };
     let up    = if us == WHITE { NORTH } else { SOUTH };
     let right = if us == WHITE { NORTH_EAST } else { SOUTH_WEST };

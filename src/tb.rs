@@ -100,35 +100,27 @@ struct Wdl;
 struct Dtm;
 struct Dtz;
 
-const WDL: i32 = 0;
-const DTM: i32 = 1;
-const DTZ: i32 = 2;
-
 struct PieceEnc;
 struct FileEnc;
 struct RankEnc;
 
-const PIECE_ENC: i32 = 0;
-const FILE_ENC: i32 = 1;
-const RANK_ENC: i32 = 2;
-
 trait Encoding {
-    fn encoding() -> i32;
+    const ENC: i32;
     type Entry: EntryInfo;
 }
 
 impl Encoding for PieceEnc {
-    fn encoding() -> i32 { PIECE_ENC }
+    const ENC: i32 = 0;
     type Entry = PieceEntry;
 }
 
 impl Encoding for FileEnc {
-    fn encoding() -> i32 { FILE_ENC }
+    const ENC: i32 = 1;
     type Entry = PawnEntry;
 }
 
 impl Encoding for RankEnc {
-    fn encoding() -> i32 { RANK_ENC }
+    const ENC: i32 = 2;
     type Entry = PawnEntry;
 }
 
@@ -136,7 +128,7 @@ trait TbType: Sized {
     type PieceTable: TbTable<Entry = PieceEntry, Type = Self>;
     type PawnTable: TbTable<Entry = PawnEntry, Type = Self>;
     type Select;
-    fn tb_type() -> i32;
+    const TYPE: i32;
     fn magic() -> u32;
     fn suffix() -> &'static str;
 }
@@ -145,7 +137,7 @@ impl TbType for Wdl {
     type PieceTable = WdlPiece;
     type PawnTable = WdlPawn;
     type Select = ();
-    fn tb_type() -> i32 { WDL }
+    const TYPE: i32 = 0;
     fn magic() -> u32 { WDL_MAGIC }
     fn suffix() -> &'static str { WDL_SUFFIX }
 }
@@ -154,7 +146,7 @@ impl TbType for Dtm {
     type PieceTable = DtmPiece;
     type PawnTable = DtmPawn;
     type Select = bool;
-    fn tb_type() -> i32 { DTM }
+    const TYPE: i32 = 1;
     fn magic() -> u32 { DTM_MAGIC }
     fn suffix() -> &'static str { DTM_SUFFIX }
 }
@@ -163,7 +155,7 @@ impl TbType for Dtz {
     type PieceTable = DtzPiece;
     type PawnTable = DtzPawn;
     type Select = i32;
-    fn tb_type() -> i32 { DTZ }
+    const TYPE: i32 = 2;
     fn magic() -> u32 { DTZ_MAGIC }
     fn suffix() -> &'static str { DTZ_SUFFIX }
 }
@@ -330,10 +322,10 @@ struct PieceEntry {
 
 impl<T> TbEntry<T> for PieceEntry where T: TbTable {
     fn table_mut(&self) -> &mut T {
-        match T::Type::tb_type() {
-            WDL => unsafe { &mut *(self.wdl.get() as *mut T) },
-            DTM => unsafe { &mut *(self.dtm.get() as *mut T) },
-            DTZ => unsafe { &mut *(self.dtz.get() as *mut T) },
+        match T::Type::TYPE {
+            Wdl::TYPE => unsafe { &mut *(self.wdl.get() as *mut T) },
+            Dtm::TYPE => unsafe { &mut *(self.dtm.get() as *mut T) },
+            Dtz::TYPE => unsafe { &mut *(self.dtz.get() as *mut T) },
             _   => panic!("Non-existing table type"),
         }
     }
@@ -341,10 +333,10 @@ impl<T> TbEntry<T> for PieceEntry where T: TbTable {
     fn table(&self) -> &T { self.table_mut() }
 
     fn exists(&self) -> bool {
-        match T::Type::tb_type() {
-            WDL => true,
-            DTM => self.has_dtm,
-            DTZ => self.has_dtz,
+        match T::Type::TYPE {
+            Wdl::TYPE => true,
+            Dtm::TYPE => self.has_dtm,
+            Dtz::TYPE => self.has_dtz,
             _   => panic!("Non-existing table type"),
         }
     }
@@ -487,10 +479,10 @@ struct PawnEntry {
 
 impl<T> TbEntry<T> for PawnEntry where T: TbTable {
     fn table_mut(&self) -> &mut T {
-        match T::Type::tb_type() {
-            WDL => unsafe { &mut *(self.wdl.get() as *mut T) },
-            DTM => unsafe { &mut *(self.dtm.get() as *mut T) },
-            DTZ => unsafe { &mut *(self.dtz.get() as *mut T) },
+        match T::Type::TYPE {
+            Wdl::TYPE => unsafe { &mut *(self.wdl.get() as *mut T) },
+            Dtm::TYPE => unsafe { &mut *(self.dtm.get() as *mut T) },
+            Dtz::TYPE => unsafe { &mut *(self.dtz.get() as *mut T) },
             _   => panic!("Non-existing table type"),
         }
     }
@@ -498,10 +490,10 @@ impl<T> TbEntry<T> for PawnEntry where T: TbTable {
     fn table(&self) -> &T { self.table_mut() }
 
     fn exists(&self) -> bool {
-        match T::Type::tb_type() {
-            WDL => true,
-            DTM => self.has_dtm,
-            DTZ => self.has_dtz,
+        match T::Type::TYPE {
+            Wdl::TYPE => true,
+            Dtm::TYPE => self.has_dtm,
+            Dtz::TYPE => self.has_dtz,
             _   => panic!("Non-existing table type"),
         }
     }
@@ -978,7 +970,7 @@ fn calc_factors<T: Encoding>(
     while i < e.num() || k == order || k == order2 {
         if k == order {
             ei.factor[0] = f as u32;
-            f *= if T::encoding() == PIECE_ENC {
+            f *= if T::ENC == PieceEnc::ENC {
                 if e.kk_enc() { 462 } else { 31332 }
             } else {
                 pfactor::<T>(ei.norm[0] as usize - 1, t)
@@ -1001,7 +993,7 @@ fn calc_factors<T: Encoding>(
 
 fn set_norm<T: Encoding>(ei: &mut EncInfo, e: &T::Entry) {
     let mut i;
-    if T::encoding() == PIECE_ENC {
+    if T::ENC == PieceEnc::ENC {
         ei.norm[0] = if e.kk_enc() { 2 } else { 3 };
         i = ei.norm[0] as usize;
     } else {
@@ -1217,7 +1209,7 @@ fn init_table<T: TbTable>(e: &T::Entry, name: &str) -> bool {
     *tb.mapping() = tb_map;
     let mut data = mmap_to_slice(tb.mapping());
 
-    let split = T::Type::tb_type() != DTZ && data[4] & 0x01 != 0;
+    let split = T::Type::TYPE != Dtz::TYPE && data[4] & 0x01 != 0;
     tb.set_loss_only(data[4] & 0x04 != 0);
 
     data = &data[5..];
@@ -1246,7 +1238,7 @@ fn init_table<T: TbTable>(e: &T::Entry, name: &str) -> bool {
         }
     }
 
-    if T::Type::tb_type() == DTM && !tb.loss_only() {
+    if T::Type::TYPE == Dtm::TYPE && !tb.loss_only() {
         let map = cast_slice(data, data.len() / 2);
         let mut idx = 0;
         for t in 0..num {
@@ -1264,7 +1256,7 @@ fn init_table<T: TbTable>(e: &T::Entry, name: &str) -> bool {
         tb.set_map(slice(&mut data, idx as usize));
     }
 
-    if T::Type::tb_type() == DTZ {
+    if T::Type::TYPE == Dtz::TYPE {
         let mut idx = 0;
         for t in 0..num {
             if tb.flags(t) & 2 != 0 {
@@ -1307,7 +1299,7 @@ fn init_table<T: TbTable>(e: &T::Entry, name: &str) -> bool {
         }
     }
 
-    if T::Type::tb_type() == DTM
+    if T::Type::TYPE == Dtm::TYPE
         && calc_key_from_pieces(&tb.ei(0, 0).pieces[0..e.num() as usize])
             != e.key()
     {
@@ -1363,7 +1355,7 @@ fn probe_helper<T: TbTable> (
         && (((key != e.key()) != tb.switched()) ==
             (pos.side_to_move() == WHITE))) as usize;
 
-    let t = if T::Enc::encoding() != PIECE_ENC {
+    let t = if T::Enc::ENC != PieceEnc::ENC {
         let color = Piece(tb.ei(0, 0).pieces[0] as u32).color();
         let b = pos.pieces_cp(color ^ flip, PAWN);
         leading_pawn_table::<T::Enc>(b, flip) as usize
@@ -1372,7 +1364,7 @@ fn probe_helper<T: TbTable> (
     let mut p: [Square; 6] = [Square(0); 6];
     fill_squares(pos, &tb.ei(t, bside).pieces, e.num() as usize, flip,
             &mut p);
-    if T::Enc::encoding() != PIECE_ENC && flip {
+    if T::Enc::ENC != PieceEnc::ENC && flip {
         for i in 0..e.num() as usize {
             p[i] = !p[i];
         }
@@ -1392,7 +1384,7 @@ fn probe_table<T: TbType>(
     let key = pos.material_key();
 
     // Test for KvK
-    if T::tb_type() == WDL && pos.pieces() == pos.pieces_p(KING) {
+    if T::TYPE == Wdl::TYPE && pos.pieces() == pos.pieces_p(KING) {
         return 0;
     }
 
@@ -2300,7 +2292,7 @@ fn skip(s1: Square, s2: Square) -> usize {
 }
 
 fn flap<T: Encoding>(s: Square) -> usize {
-    if T::encoding() == FILE_ENC {
+    if T::ENC == FileEnc::ENC {
         FLAP[s.0 as usize] as usize
     } else {
         FLAP2[s.0 as usize] as usize
@@ -2308,7 +2300,7 @@ fn flap<T: Encoding>(s: Square) -> usize {
 }
 
 fn ptwist<T: Encoding>(s: Square) -> usize {
-    if T::encoding() == FILE_ENC {
+    if T::ENC == FileEnc::ENC {
         PTWIST[s.0 as usize] as usize
     } else {
         PTWIST2[s.0 as usize] as usize
@@ -2324,7 +2316,7 @@ fn binomial(n: usize, k: usize) -> usize {
 }
 
 fn pawn_idx<T: Encoding>(num: usize, s: usize) -> usize {
-    if T::encoding() == FILE_ENC {
+    if T::ENC == FileEnc::ENC {
         unsafe { PAWN_IDX[num][s] as usize }
     } else {
         unsafe { PAWN_IDX2[num][s] as usize }
@@ -2332,7 +2324,7 @@ fn pawn_idx<T: Encoding>(num: usize, s: usize) -> usize {
 }
 
 fn pfactor<T: Encoding>(num: usize, s: usize) -> usize {
-    if T::encoding() == FILE_ENC {
+    if T::ENC == FileEnc::ENC {
         unsafe { PFACTOR[num][s] as usize }
     } else {
         unsafe { PFACTOR2[num][s] as usize }
@@ -2380,7 +2372,7 @@ fn init_indices() {
 }
 
 fn leading_pawn_table<T: Encoding>(pawns: Bitboard, flip: bool) -> u32 {
-    if T::encoding() == FILE_ENC {
+    if T::ENC == FileEnc::ENC {
         if pawns & (FILEA_BB | FILEB_BB | FILEG_BB | FILEH_BB) != 0 {
             if pawns & (FILEA_BB | FILEH_BB) != 0 { FILE_A } else { FILE_B }
         } else {
@@ -2406,7 +2398,7 @@ fn encode<T: Encoding>(
 
     let mut i;
     let mut idx;
-    if T::encoding() == PIECE_ENC {
+    if T::ENC == PieceEnc::ENC {
         if p[0].0 & 0x20 != 0 {
             for i in 0..n {
                 p[i] = Square(p[i].0 ^ 0x38);

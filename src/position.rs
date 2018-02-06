@@ -1284,7 +1284,6 @@ impl Position {
         &mut self, us: Color, from: Square, to: &mut Square,
         rfrom: &mut Square, rto: &mut Square,
     ) {
-        let do_castle = Do::bool();
         let king_side = *to > from;
         *rfrom = *to; // Castling is encoded as king captures rook
         *rto = relative_square(us,
@@ -1294,16 +1293,16 @@ impl Position {
 
         // Remove both pieces first since squares could overlap in Chess960
         self.remove_piece(Piece::make(us, KING),
-            if do_castle { from } else { *to });
+            if Do::BOOL { from } else { *to });
         self.remove_piece(Piece::make(us, ROOK),
-            if do_castle { *rfrom } else { *rto });
-        self.board[(if do_castle { from } else { *to }).0 as usize] = NO_PIECE;
-        self.board[(if do_castle { *rfrom } else { *rto }).0 as usize] =
+            if Do::BOOL { *rfrom } else { *rto });
+        self.board[(if Do::BOOL { from } else { *to }).0 as usize] = NO_PIECE;
+        self.board[(if Do::BOOL { *rfrom } else { *rto }).0 as usize] =
             NO_PIECE;
         self.put_piece(Piece::make(us, KING),
-            if do_castle { *to } else { from });
+            if Do::BOOL { *to } else { from });
         self.put_piece(Piece::make(us, ROOK),
-            if do_castle { *rto } else { *rfrom });
+            if Do::BOOL { *rto } else { *rfrom });
     }
 
     // do(undo)_null_move() is used to do(undo) a "null move": it flips the
