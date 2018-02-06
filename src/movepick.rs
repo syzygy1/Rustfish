@@ -116,6 +116,7 @@ pub struct MovePickerQ {
     cur: usize,
     end_moves: usize,
     stage: i32,
+    depth: Depth,
     tt_move: Move,
     recapture_square: Square,
     list: [ExtMove; MAX_MOVES as usize],
@@ -130,29 +131,26 @@ pub struct MovePickerPC {
     list: [ExtMove; MAX_MOVES as usize],
 }
 
-const MAIN_SEARCH:         i32 = 0;
-const CAPTURES_INIT:       i32 = 1;
-const GOOD_CAPTURES:       i32 = 2;
-const KILLERS:             i32 = 3;
-const COUNTERMOVE:         i32 = 4;
-const QUIET_INIT:          i32 = 5;
-const QUIET:               i32 = 6;
-const BAD_CAPTURES:        i32 = 7;
-const EVASION:             i32 = 8;
-const EVASIONS_INIT:       i32 = 9;
-const ALL_EVASIONS:        i32 = 10;
-const PROBCUT:             i32 = 11;
-const PROBCUT_INIT:        i32 = 12;
-const PROBCUT_CAPTURES:    i32 = 13;
-const QSEARCH_WITH_CHECKS: i32 = 14;
-const QCAPTURES_1_INIT:    i32 = 15;
-const QCAPTURES_1:         i32 = 16;
-const QCHECKS:             i32 = 17;
-const QSEARCH_NO_CHECKS:   i32 = 18;
-const QCAPTURES_2_INIT:    i32 = 19;
-const QCAPTURES_2:         i32 = 20;
-const QSEARCH_RECAPTURES:  i32 = 21;
-const QRECAPTURES:         i32 = 22;
+const MAIN_SEARCH:        i32 = 0;
+const CAPTURES_INIT:      i32 = 1;
+const GOOD_CAPTURES:      i32 = 2;
+const KILLERS:            i32 = 3;
+const COUNTERMOVE:        i32 = 4;
+const QUIET_INIT:         i32 = 5;
+const QUIET:              i32 = 6;
+const BAD_CAPTURES:       i32 = 7;
+const EVASION:            i32 = 8;
+const EVASIONS_INIT:      i32 = 9;
+const ALL_EVASIONS:       i32 = 10;
+const PROBCUT:            i32 = 11;
+const PROBCUT_INIT:       i32 = 12;
+const PROBCUT_CAPTURES:   i32 = 13;
+const QSEARCH:            i32 = 14;
+const QCAPTURES_INIT:     i32 = 15;
+const QCAPTURES:          i32 = 16;
+const QCHECKS:            i32 = 17;
+const QSEARCH_RECAPTURES: i32 = 18;
+const QRECAPTURES:        i32 = 19;
 
 // partial_insertion_sort() sorts moves in descending order up to and
 // including a given limit.
@@ -392,10 +390,8 @@ impl MovePickerQ {
         loop {
             if pos.checkers() != 0 {
                 stage = EVASION;
-            } else if d > Depth::QS_NO_CHECKS {
-                stage = QSEARCH_WITH_CHECKS;
             } else if d > Depth::QS_RECAPTURES {
-                stage = QSEARCH_NO_CHECKS;
+                stage = QSEARCH;
             } else {
                 stage = QSEARCH_RECAPTURES;
                 break;
@@ -416,6 +412,7 @@ impl MovePickerQ {
             cur: 0,
             end_moves: 0,
             stage: stage,
+            depth: d,
             tt_move: ttm,
             recapture_square: s,
             list: [ExtMove {m: Move::NONE, value: 0}; MAX_MOVES as usize],
@@ -424,11 +421,11 @@ impl MovePickerQ {
 
     pub fn next_move(&mut self, pos: &Position) -> Move {
         loop { match self.stage {
-            EVASION | QSEARCH_WITH_CHECKS | QSEARCH_NO_CHECKS => {
+            EVASION | QSEARCH => {
                 self.stage += 1;
                 return self.tt_move;
             }
-            
+
             EVASIONS_INIT => {
                 self.cur = 0;
                 self.end_moves = generate::<Evasions>(pos, &mut self.list, 0);
@@ -447,14 +444,14 @@ impl MovePickerQ {
                 break;
             }
 
-            QCAPTURES_1_INIT | QCAPTURES_2_INIT | QSEARCH_RECAPTURES => {
+            QCAPTURES_INIT => {
                 self.cur = 0;
                 self.end_moves = generate::<Captures>(pos, &mut self.list, 0);
                 score_captures(pos, &mut self.list[..self.end_moves]);
                 self.stage += 1;
             }
 
-            QCAPTURES_1 | QCAPTURES_2 => {
+            QCAPTURES => {
                 while self.cur < self.end_moves {
                     let m = pick_best(&mut self.list[self.cur..self.end_moves]);
                     self.cur += 1;
@@ -462,11 +459,12 @@ impl MovePickerQ {
                         return m;
                     }
                 }
-                if self.stage == QCAPTURES_2 {
+                if self.depth <= Depth::QS_NO_CHECKS {
                     break;
                 }
                 self.cur = 0;
-                self.end_moves = generate::<QuietChecks>(pos, &mut self.list, 0);
+                self.end_moves =
+                    generate::<QuietChecks>(pos, &mut self.list, 0);
                 self.stage += 1;
             }
 
@@ -479,6 +477,12 @@ impl MovePickerQ {
                     }
                 }
                 break;
+            }
+
+            QSEARCH_RECAPTURES => {
+                self.cur = 0;
+                self.end_moves = generate::<Captures>(pos, &mut self.list, 0);
+                self.stage += 1;
             }
 
             QRECAPTURES => {
