@@ -139,24 +139,24 @@ const ROOK_ON_FILE: [Score; 2] = [ S!(20, 7), S!(45, 20) ];
 // which piece type attacks which one. Attacks on lesser pieces which are
 // pawn-defended are not considered.
 const THREAT_BY_MINOR: [Score; 8] = [
-    S!(0, 0), S!(0, 33), S!(45, 43), S!(46, 47), S!(72, 107), S!(48, 118),
+    S!(0, 0), S!(0, 31), S!(39, 42), S!(57, 44), S!(68, 112), S!(47, 120),
     S0, S0,
 ];
 
 const THREAT_BY_ROOK: [Score; 8] = [
-    S!(0, 0), S!(0, 25), S!(40, 62), S!(40, 59), S!(0, 34), S!(35, 48),
+    S!(0, 0), S!(0, 24), S!(38, 71), S!(38, 61), S!(0, 38), S!(36, 38),
     S0, S0,
 ];
 
 // THREAT_BY_KING[on one/on many] contains bonuses for king attacks on pawns
 // or pieces which are not pawn-defended.
-const THREAT_BY_KING: [Score; 2] = [ S!(3, 62), S!(9, 138) ];
+const THREAT_BY_KING: [Score; 2] = [ S!(3, 65), S!(9, 145) ];
 
 // PASSED[mg/eg][Rank] contains midgame and endgame bonuses for passed pawns.
 // We don't use a Score because we process the two components independently.
 const PASSED: [[i32; 8]; 2] = [
-    [ 0, 5,  5, 31, 73, 166, 252, 0 ],
-    [ 0, 7, 14, 38, 73, 166, 252, 0 ],
+    [ 0, 5,  5, 32, 70, 172, 217, 0 ],
+    [ 0, 7, 13, 42, 70, 170, 269, 0 ],
 ];
 
 // PASSED_FILE[File] contains a bonus according to the file of a passed pawn
@@ -166,7 +166,7 @@ const PASSED_FILE: [Score; 8] = [
 ];
 
 // Rank-dependent factor for a passed-pawn bonus
-const RANK_FACTOR: [i32; 8] = [ 0, 0, 0, 2, 6, 11, 16, 0 ];
+const RANK_FACTOR: [i32; 8] = [ 0, 0, 0, 2, 7, 12, 19, 0 ];
 
 // KING_PROTECTOR[PieceType-2] contains a bonus according to distance from
 // king
@@ -183,13 +183,13 @@ const TRAPPED_ROOK:              Score = S!( 92,  0);
 const WEAK_QUEEN:                Score = S!( 50, 10);
 const CLOSE_ENEMIES:             Score = S!(  7,  0);
 const PAWNLESS_FLANK:            Score = S!( 20, 80);
-const THREAT_BY_SAFE_PAWN:       Score = S!(192,175);
+const THREAT_BY_SAFE_PAWN:       Score = S!(175,168);
 const THREAT_BY_RANK:            Score = S!( 16,  3);
-const HANGING:                   Score = S!( 48, 27);
+const HANGING:                   Score = S!( 52, 30);
 const WEAK_UNOPPOSED_PAWN:       Score = S!(  5, 25);
-const THREAT_BY_PAWN_PUSH:       Score = S!( 38, 22);
-const THREAT_BY_ATTACK_ON_QUEEN: Score = S!( 38, 22);
-const HINDER_PASSED_PAWN:        Score = S!(  7,  0);
+const THREAT_BY_PAWN_PUSH:       Score = S!( 47, 26);
+const THREAT_BY_ATTACK_ON_QUEEN: Score = S!( 42, 21);
+const HINDER_PASSED_PAWN:        Score = S!(  8,  1);
 const TRAPPED_BISHOP_A1H1:       Score = S!( 50, 50);
 
 // king_attack_weights[PieceType] contains king attack weights by piece
@@ -728,8 +728,8 @@ fn evaluate_passed_pawns<Us: ColorTrait>(
                 // If there aren't any enemy attacks, assign a big bonus.
                 // Otherwise assign a smaller bonus if the block square isn't
                 // attacked.
-                let mut k = if unsafe_squares == 0 { 18 }
-                        else if unsafe_squares & block_sq == 0 { 8 }
+                let mut k = if unsafe_squares == 0 { 20 }
+                        else if unsafe_squares & block_sq == 0 { 9 }
                         else { 0 };
 
                 // If the path to the queen is fully defended, assign a big

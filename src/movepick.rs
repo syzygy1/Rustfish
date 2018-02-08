@@ -332,17 +332,17 @@ impl MovePicker {
             }
 
             QUIET => {
-                while self.cur < self.end_moves
-                    && (!skip_quiets || self.list[self.cur].value >= 0)
-                {
-                    let m = self.list[self.cur].m;
-                    self.cur += 1;
-                    if m != self.tt_move
-                        && m != self.killers[0]
-                        && m != self.killers[1]
-                        && m != self.countermove
-                    {
-                        return m;
+                if !skip_quiets {
+                    while self.cur < self.end_moves {
+                        let m = self.list[self.cur].m;
+                        self.cur += 1;
+                        if m != self.tt_move
+                            && m != self.killers[0]
+                            && m != self.killers[1]
+                            && m != self.countermove
+                        {
+                            return m;
+                        }
                     }
                 }
                 self.stage += 1;
