@@ -40,6 +40,10 @@ enum OptVal {
         cur: bool,
     },
     Button,
+    Combo {
+        def: &'static str,
+        cur: String,
+    },
 }
 
 impl OptVal {
@@ -63,6 +67,14 @@ impl OptVal {
         OptVal::Check {
             def: def,
             cur: def,
+        }
+    }
+
+    pub fn combo(def: &'static str) -> OptVal {
+        OptVal::Combo {
+            def: def,
+            cur: String::from(&def[0..def.find(" var").unwrap()])
+                .to_lowercase(),
         }
     }
 }
@@ -94,8 +106,9 @@ static mut OPTIONS: *mut Vec<Opt> = 0 as *mut Vec<Opt>;
 pub fn init()
 {
     let mut opts = Box::new(Vec::new());
-    opts.push(Opt::new("Contempt", OptVal::spin(20, -100, 100), None));
-    opts.push(Opt::new("Analysis Contempt", OptVal::check(false), None));
+    opts.push(Opt::new("Contempt", OptVal::spin(18, -100, 100), None));
+    opts.push(Opt::new("Analysis Contempt",
+        OptVal::combo("Off var Off var White var Black"), None));
     opts.push(Opt::new("Threads", OptVal::spin(1, 1, 512), Some(on_threads)));
     opts.push(Opt::new("Hash", OptVal::spin(16, 1, 128 * 1024),
         Some(on_hash_size)));
@@ -128,13 +141,13 @@ pub fn print() {
     let opts: Box<Vec<Opt>> = unsafe { Box::from_raw(OPTIONS) };
     for opt in opts.iter() {
         print!("\noption name {} type {}", opt.key, match opt.val {
-            OptVal::StringOpt { def, .. } =>
-                format!("string default {}", def),
+            OptVal::StringOpt { def, .. } => format!("string default {}", def),
             OptVal::Spin { def, min, max, .. } =>
                 format!("spin default {} min {} max {}", def, min, max),
             OptVal::Check { def, .. } =>
                 format!("check default {}", if def { true } else { false }),
             OptVal::Button => format!("button"),
+            OptVal::Combo { def, .. } => format!("combo default {}", def),
         });
     }
     print!("\n");
@@ -149,6 +162,8 @@ pub fn set(key: &str, val: &str) {
             OptVal::Spin { ref mut cur, .. } => *cur = val.parse().unwrap(),
             OptVal::Check { ref mut cur, .. } => *cur = val == "true",
             OptVal::Button => {},
+            OptVal::Combo { ref mut cur, .. } =>
+                *cur = String::from(val).to_lowercase(),
         }
         if let Some(on_change) = opt.on_change {
             on_change(&opt.val);
@@ -186,6 +201,8 @@ pub fn get_string(key: &str) -> String {
     let val = {
         let opt = opts.iter().find(|ref o| o.key == key).unwrap();
         if let OptVal::StringOpt { ref cur, ..} = opt.val {
+            String::from(cur.as_str())
+        } else if let OptVal::Combo { ref cur, ..} = opt.val {
             String::from(cur.as_str())
         } else {
             String::new()

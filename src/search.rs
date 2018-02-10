@@ -277,24 +277,7 @@ pub fn mainthread_search(pos: &mut Position, th: &threads::ThreadCtrl) {
     timeman::init(limits(), us, pos.game_ply());
     tt::new_search();
 
-    let analyzing = limits().infinite || ucioption::get_bool("UCI_AnalyseMode");
-
-    // When analyzing, use contempt only if the user has said so
-    let contempt =
-        if !analyzing || ucioption::get_bool("Analysis Contempt") {
-            ucioption::get_i32("Contempt") * PawnValueEg / 100
-        } else {
-            Value::ZERO
-        };
-
-    let contempt = Score::make(contempt.0, contempt.0 / 2);
-
-    unsafe {
-        evaluate::CONTEMPT = if analyzing || us == WHITE { contempt }
-            else { -contempt }
-    }
-
-    if pos.root_moves.is_empty() {
+   if pos.root_moves.is_empty() {
         pos.root_moves.push(RootMove::new(Move::NONE));
         println!("info depth 0 score {}", uci::value(
             if pos.checkers() != 0 { -Value::MATE } else { Value::DRAW }));
@@ -395,8 +378,27 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
         pos.best_move_changes = 0.0;
     }
 
+    let us = pos.side_to_move();
+
     let mut multi_pv = ucioption::get_i32("MultiPV") as usize;
     multi_pv = std::cmp::min(multi_pv, pos.root_moves.len());
+
+    let mut base_ct = ucioption::get_i32("Contempt") * PawnValueEg.0 / 100;
+
+    // In analysis mode, adjust contempt in accordance with user preference
+    if limits().infinite || ucioption::get_bool("UCI_AnalyseMode") {
+        base_ct = match ucioption::get_string("Analysis Contempt").as_ref() {
+            "off" => 0,
+            "white" => if us == WHITE { base_ct } else { -base_ct },
+            "black" => if us == BLACK { base_ct } else { -base_ct },
+            _ => base_ct,
+        }
+    }
+
+    unsafe {
+        let contempt = Score::make(base_ct, base_ct / 2);
+        evaluate::CONTEMPT = if us == WHITE { contempt } else { -contempt };
+    }
 
     let mut root_depth = Depth::ZERO;
 
@@ -481,6 +483,13 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                 beta = std::cmp::min(
                     pos.root_moves[pos.pv_idx].previous_score + delta,
                     Value::INFINITE);
+                let ct = base_ct + (if best_value > Value(500) { 50 }
+                    else if best_value < Value(-500) { -50 }
+                    else { best_value.0 / 10 });
+                let ct = Score::make(ct, ct / 2);
+                unsafe {
+                    evaluate::CONTEMPT = if us == WHITE { ct } else { -ct }
+                }
             }
 
             // Start with a small aspiration window and, in the case of a fail
@@ -583,13 +592,7 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                 let improving_factor = std::cmp::max(229,
                     std::cmp::min(715, 357 + 119 * f[0] - 6 * f[1]));
 
-                let us = pos.side_to_move();
-                let think_hard = best_value == Value::DRAW
-                    && limits().time[us.0 as usize] - timeman::elapsed() >
-                        limits().time[(!us).0 as usize]
-                    && pv_is_draw(pos);
-                let mut unstable_pv_factor = 1. + pos.best_move_changes
-                    + (if think_hard { 1. } else { 0. });
+                let mut unstable_pv_factor = 1. + pos.best_move_changes;
 
                 // if the best_move is stable over several iterations, reduce
                 // time for this move, the longer the move has been stable,
@@ -597,9 +600,7 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                 // stable move for the current move.
                 time_reduction = 1.;
                 for i in 3..6 {
-                    if last_best_move_depth * i < pos.completed_depth
-                        && !think_hard
-                    {
+                    if last_best_move_depth * i < pos.completed_depth {
                         time_reduction *= 1.3;
                     }
                     unstable_pv_factor *=
@@ -609,7 +610,7 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                         || (timeman::elapsed() as f64) >
                             (timeman::optimum() as f64) *
                             unstable_pv_factor *
-                            (improving_factor as f64) / 628.0
+                            (improving_factor as f64) / 605.0
                     {
                         // If we are allowed to ponder do not stop the search
                         // now but keep pondering until the GUI sends
@@ -1736,26 +1737,6 @@ fn update_stats(
         update_continuation_histories(&ss[1..], pos.moved_piece(quiets[i]),
             quiets[i].to(), -bonus);
     }
-}
-
-// Is the PV leading to a draw position?
-fn pv_is_draw(pos: &mut Position) -> bool {
-    let pv_len = pos.root_moves[0].pv.len();
-
-    for i in 0..pv_len {
-        let m = pos.root_moves[0].pv[i];
-        let gives_check = pos.gives_check(m);
-        pos.do_move(m, gives_check);
-    }
-
-    let is_draw = pos.is_draw(pv_len as i32);
-
-    for i in (0..pv_len).rev() {
-        let m = pos.root_moves[0].pv[i];
-        pos.undo_move(m);
-    }
-
-    is_draw
 }
 
 fn update_counters(pos: &Position) {
