@@ -140,11 +140,6 @@ impl Entry {
         self.semiopen_files[c.0 as usize] & (1 << f)
     }
 
-    pub fn semiopen_side(&self, c: Color, f: File, left_side: bool) -> i32 {
-        self.semiopen_files[c.0 as usize]
-        & (if left_side { (1 << f) - 1 } else { !((1 << (f + 1)) - 1) })
-    }
-
     pub fn pawns_on_same_color_squares(&self, c: Color, s: Square) -> i32 {
         self.pawns_on_squares[c.0 as usize][((DARK_SQUARES & s) != 0) as usize]
     }

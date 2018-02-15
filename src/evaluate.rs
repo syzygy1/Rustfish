@@ -397,11 +397,9 @@ fn evaluate_pieces<Us: ColorTrait, Pt: PieceTypeTrait> (
             // Penalty when trapped by the king, even more if the king cannot
             // castle
             else if mob <= 3 {
-                let ksq = pos.square(us, KING);
+                let kf = pos.square(us, KING).file();
 
-                if (ksq.file() < FILE_E) == (s.file() < ksq.file())
-                    && ei.pe.semiopen_side(us, ksq.file(), s.file() <
-                        ksq.file()) == 0
+                if (kf < FILE_E) == (s.file() < kf)
                 {
                     score -= (TRAPPED_ROOK - Score::make((mob as i32) * 22, 0))
                         * (1 + ((!pos.can_castle(us)) as i32));
