@@ -209,7 +209,7 @@ fn perft<Root: Bool>(pos: &mut Position, depth: Depth) -> u64 {
         } else {
             let checks = pos.gives_check(m);
             pos.do_move(m, checks);
-            cnt = if leaf { MoveList::new::<Legal>(pos).size() as u64 }
+            cnt = if leaf { MoveList::new::<Legal>(pos).len() as u64 }
                 else { perft::<False>(pos, depth - ONE_PLY) };
             nodes += cnt;
             pos.undo_move(m);

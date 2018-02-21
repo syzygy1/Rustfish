@@ -166,7 +166,7 @@ pub fn evaluate_kxk(pos: &Position, strong_side: Color) -> Value
 
     // Stalemate detection with lone king
     if pos.side_to_move() == weak_side {
-        if MoveList::new::<Legal>(pos).size() == 0 {
+        if MoveList::new::<Legal>(pos).len() == 0 {
             return Value::DRAW;
         }
     }

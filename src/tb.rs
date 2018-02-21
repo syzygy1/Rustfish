@@ -1612,7 +1612,7 @@ fn probe_dtm_loss(pos: &mut Position, success: &mut i32) -> Value {
 
     // If there are en-passant captures, the position without ep rights
     // may be a stalemate. If it is, we must avoid probing the DTM table.
-    if num_ep != 0 && MoveList::new::<Legal>(pos).size() == num_ep {
+    if num_ep != 0 && MoveList::new::<Legal>(pos).len() == num_ep {
         return best;
     }
 
@@ -1850,7 +1850,7 @@ fn root_probe_dtz(pos: &mut Position, root_moves: &mut RootMoves) -> bool {
         // Make sure that a mating move gets value 1
         if pos.checkers() != 0
             && v == 2
-            && MoveList::new::<Legal>(pos).size() == 0
+            && MoveList::new::<Legal>(pos).len() == 0
         {
             v = 1;
         }

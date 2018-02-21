@@ -1481,7 +1481,7 @@ impl Position {
     pub fn is_draw(&self, ply: i32) -> bool {
         if self.st().rule50 > 99
             && (self.checkers() == 0
-                || MoveList::new::<Legal>(&self).size() != 0)
+                || MoveList::new::<Legal>(&self).len() != 0)
         {
             return true;
         }

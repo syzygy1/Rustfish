@@ -59,13 +59,13 @@ pub struct ExtMove {
     pub value: i32,
 }
 
-// The MoveList struct is a simple wrapper around generate_*(). It sometimes
-// comes in handy to use this struct instead of the low-level generate_*()
+// The MoveList struct is a simple wrapper around generate::<*>(). It sometimes
+// comes in handy to use this struct instead of the low-level generate::<*>()
 // functions.
 pub struct MoveList {
     list: [ExtMove; MAX_MOVES],
     idx: usize,
-    num: usize,
+    len: usize,
 }
 
 impl MoveList {
@@ -73,30 +73,20 @@ impl MoveList {
         let mut moves = MoveList {
             list: [ExtMove { m : Move::NONE, value: 0 }; MAX_MOVES],
             idx: 0,
-            num: 0,
+            len: 0,
         };
-        { // we need to borrow "moves"
-            let mut list: &mut [ExtMove] = &mut moves.list;
-            moves.num = match T::TYPE {
-                CAPTURES     => generate::<Captures   >(pos, &mut list, 0),
-                QUIETS       => generate::<Quiets     >(pos, &mut list, 0),
-                QUIET_CHECKS => generate::<QuietChecks>(pos, &mut list, 0),
-                EVASIONS     => generate::<Evasions   >(pos, &mut list, 0),
-                NON_EVASIONS => generate::<NonEvasions>(pos, &mut list, 0),
-                _            => generate::<Legal      >(pos, &mut list, 0),
-            };
-            moves.idx = 0;
-        } // borrow ends here, so we can move out "moves"
+        moves.len = generate::<T>(pos, &mut moves.list, 0);
+        moves.idx = 0;
         moves
     }
 
-    pub fn size(&self) -> usize {
-        self.num
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     pub fn contains(&self, m: Move) -> bool {
         let mut i = 0;
-        while i < self.num {
+        while i < self.len {
             if self.list[i].m == m {
                 return true;
             }
@@ -109,7 +99,7 @@ impl MoveList {
 impl Iterator for MoveList {
     type Item = Move;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.idx == self.num {
+        if self.idx == self.len {
             None
         } else {
             self.idx += 1;
