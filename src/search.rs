@@ -170,7 +170,7 @@ fn futility_margin(d: Depth) -> Value {
 }
 
 fn razor_margin() -> Value {
-    Value(600)
+    Value(590)
 }
 
 // Futility and reductions lookup tables, initialized at startup
@@ -858,20 +858,11 @@ fn search<NT: NodeType>(
 
         // Step 6. Razoring (skipped when in check)
         if !pv_node
-            && depth < 4 * ONE_PLY
+            && depth <= ONE_PLY
             && eval + razor_margin() <= alpha
         {
-            if depth <= ONE_PLY {
-                return qsearch::<NonPv, False>(pos, ss, alpha, alpha+1,
-                    Depth::ZERO);
-            }
-
-            let ralpha = alpha - razor_margin();
-            let v = qsearch::<NonPv, False>(pos, ss, ralpha, ralpha+1,
+            return qsearch::<NonPv, False>(pos, ss, alpha, alpha+1,
                 Depth::ZERO);
-            if v <= ralpha {
-                return v;
-            }
         }
 
         // Step 7. Futility pruning: child node (skipped when in check)
