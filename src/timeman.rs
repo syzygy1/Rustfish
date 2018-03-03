@@ -31,9 +31,9 @@ use self::TimeType::*;
 // Plan time management at most this many moves ahread
 const MOVE_HORIZON: i32 = 50;
 // When in trouble, we can step over reserved time with this ratio
-const MAX_RATIO: f64 = 7.09;
+const MAX_RATIO: f64 = 7.3;
 // But we must not steal time from remaining moves over this ratio
-const STEAL_RATIO: f64 = 0.35;
+const STEAL_RATIO: f64 = 0.34;
 
 // importance() is a skew-logistic function based on naive statistical
 // analysis of "how many games are still undecided after n half moves".
@@ -42,9 +42,9 @@ const STEAL_RATIO: f64 = 0.35;
 // simply filtering criteria.
 
 fn importance(ply: i32) -> f64 {
-    const XSCALE: f64 = 7.64;
-    const XSHIFT: f64 = 58.4;
-    const SKEW:   f64 = 0.183;
+    const XSCALE: f64 = 6.85;
+    const XSHIFT: f64 = 64.5;
+    const SKEW:   f64 = 0.171;
 
     (1. + ((ply as f64 - XSHIFT) / XSCALE).exp()).powf(-SKEW)
     + std::f64::MIN_POSITIVE

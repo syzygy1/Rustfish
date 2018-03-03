@@ -4,6 +4,7 @@ extern crate memmap;
 
 mod benchmark;
 mod bitbases;
+#[macro_use]
 mod bitboard;
 mod endgame;
 mod evaluate;

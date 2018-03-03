@@ -240,7 +240,7 @@ fn generate_pawn_moves<Us: ColorTrait, T: GenType>(
             // because we don't generate captures. Note that a possible
             // discovery check promotion has already been generated together
             // with the captures.
-            let dc_candidates = pos.discovered_check_candidates();
+            let dc_candidates = pos.blockers_for_king(them);
             if pawns_not_on_7 & dc_candidates != 0 {
                 let dc1 =
                     (pawns_not_on_7 & dc_candidates).shift(up)
@@ -351,7 +351,7 @@ fn generate_moves<Pt: PieceTypeTrait, Checks: Bool>(
                 continue;
             }
 
-            if pos.discovered_check_candidates() & from != 0 {
+            if pos.blockers_for_king(!us) & from != 0 {
                 continue;
             }
         }
@@ -417,7 +417,7 @@ pub fn generate_quiet_checks(
     debug_assert!(pos.checkers() == 0);
 
     let us = pos.side_to_move();
-    let dc = pos.discovered_check_candidates();
+    let dc = pos.blockers_for_king(!us) & pos.pieces_c(us);
 
     for from in dc {
         let pt = pos.piece_on(from).piece_type();
@@ -490,8 +490,9 @@ fn generate_evasions(
 fn generate_legal(
     pos: &Position, list: &mut [ExtMove], idx: usize
 ) -> usize {
-    let pinned = pos.pinned_pieces(pos.side_to_move()) != 0;
-    let ksq = pos.square(pos.side_to_move(), KING);
+    let us = pos.side_to_move();
+    let pinned = pos.blockers_for_king(us) & pos.pieces_c(us);
+    let ksq = pos.square(us, KING);
 
     let pseudo = if pos.checkers() != 0 {
         generate::<Evasions>(pos, list, idx)
@@ -502,7 +503,7 @@ fn generate_legal(
     let mut legal = idx;
     for i in idx..pseudo {
         let m = list[i].m;
-        if (!pinned && m.from() != ksq && m.move_type() != ENPASSANT)
+        if (pinned == 0 && m.from() != ksq && m.move_type() != ENPASSANT)
             || pos.legal(m)
         {
             list[legal].m = m;

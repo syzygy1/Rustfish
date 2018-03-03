@@ -249,6 +249,14 @@ impl Square {
     pub fn bb(self) -> Bitboard {
         Bitboard::from(self)
     }
+
+    pub fn file_bb(self) -> Bitboard {
+        file_bb(self.file())
+    }
+
+    pub fn rank_bb(self) -> Bitboard {
+        unsafe { RANK_BB[self.rank() as usize] }
+    }
 }
 
 impl std::ops::BitOr<Bitboard> for Bitboard {
@@ -400,15 +408,18 @@ impl Iterator for Bitboard {
     }
 }
 
-// rank_bb() and file_bb() return a bitboard representing all the squares
-// on the given file or rank.
-
-pub fn rank_bb(r: Rank) -> Bitboard {
-    unsafe { RANK_BB[r as usize] }
-}
+// file_bb() return a bitboard representing all the squares on the given file.
 
 pub fn file_bb(f: File) -> Bitboard {
     unsafe { FILE_BB[f as usize] }
+}
+
+// bitboard!(A1, A2, ...) creates a bitboard with squares A1, A2, ...
+
+macro_rules! bitboard {
+    () => { Bitboard(0) };
+    ($sq:ident) => { bitboard!() | Square::$sq };
+    ($sq:ident, $($sqs:ident),+) => { bitboard!($($sqs),*) | Square::$sq };
 }
 
 // shift() moves a bitboard one step along direction D. Mainly for pawns.
@@ -661,8 +672,8 @@ fn init_magics(
 ) {
     for s in ALL_SQUARES {
         // Board edges are not considered in the relevant occupancies
-        let edges = ((RANK1_BB | RANK8_BB) & !rank_bb(s.rank()))
-            | ((FILEA_BB | FILEH_BB) & !file_bb(s.file()));
+        let edges = ((RANK1_BB | RANK8_BB) & !s.rank_bb())
+            | ((FILEA_BB | FILEH_BB) & !s.file_bb());
 
         let mask = sliding_attack(dirs, s, Bitboard(0)) & !edges;
 

@@ -165,27 +165,32 @@ impl Entry {
     ) -> Value {
         let us = Us::COLOR;
         let them = if us == WHITE { BLACK} else { WHITE };
+        let shelter_mask = if us == WHITE { bitboard!(A2, B3, C2, F2, G3, H2) }
+            else { bitboard!(A7, B6, C7, F7, G6, H7) };
+        let storm_mask = if us == WHITE { bitboard!(A3, C3, F3, H3) }
+            else { bitboard!(A6, C6, F6, H6) };
 
         const BLOCKED_BY_KING: usize = 0;
         const UNOPPOSED: usize = 1;
         const BLOCKED_BY_PAWN: usize = 2;
         const UNBLOCKED: usize = 3;
 
+        let center = std::cmp::max(FILE_B, std::cmp::min(FILE_G, ksq.file()));
         let b = pos.pieces_p(PAWN)
-            & (forward_ranks_bb(us, ksq) | rank_bb(ksq.rank()));
+            & (forward_ranks_bb(us, ksq) | ksq.rank_bb())
+            & (adjacent_files_bb(center) | file_bb(center));
         let our_pawns = b & pos.pieces_c(us);
         let their_pawns = b & pos.pieces_c(them);
         let mut safety = MAX_SAFETY_BONUS;
-        let center = std::cmp::max(FILE_B, std::cmp::min(FILE_G, ksq.file()));
 
         for f in (center-1)..(center+2) {
             let b = our_pawns & file_bb(f);
             let rk_us = if b != 0 { backmost_sq(us, b).relative_rank(us) }
-                        else { RANK_1 };
+                else { RANK_1 };
 
             let b = their_pawns & file_bb(f);
             let rk_them = if b != 0 { frontmost_sq(them, b).relative_rank(us) }
-                          else { RANK_1 };
+                else { RANK_1 };
 
             let d = std::cmp::min(f, FILE_H - f);
             safety -= SHELTER_WEAKNESS[(f == ksq.file()) as usize][d as usize]
@@ -197,6 +202,12 @@ impl Entry {
                      else if rk_them == rk_us + 1 { BLOCKED_BY_PAWN }
                      else { UNBLOCKED }]
                     [d as usize][rk_them as usize];
+        }
+
+        if popcount((our_pawns & shelter_mask)
+                | (their_pawns & storm_mask)) == 5
+        {
+            safety += 300;
         }
 
         safety
@@ -279,10 +290,12 @@ pub fn probe(pos: &Position) -> &mut Entry {
 
     e.key = key;
     e.score = evaluate::<White>(pos, e) - evaluate::<Black>(pos, e);
-    e.asymmetry = (e.semiopen_files[WHITE.0 as usize]
-        ^ e.semiopen_files[BLACK.0 as usize]).count_ones() as i32;
     e.open_files = (e.semiopen_files[WHITE.0 as usize]
         & e.semiopen_files[BLACK.0 as usize]).count_ones() as i32;
+    e.asymmetry = (e.passed_pawns[WHITE.0 as usize].0
+        | e.passed_pawns[BLACK.0 as usize].0
+        | (e.semiopen_files[WHITE.0 as usize]
+            ^ e.semiopen_files[BLACK.0 as usize]) as u64).count_ones() as i32;
 
     e
 }
@@ -327,8 +340,8 @@ fn evaluate<Us: ColorTrait>(pos: &Position, e: &mut Entry) -> Score {
         let lever_push = their_pawns & pawn_attacks(us, s + up);
         let doubled    = our_pawns & (s - up);
         let neighbours = our_pawns & adjacent_files_bb(f);
-        let phalanx    = neighbours & rank_bb(s.rank());
-        let supported  = neighbours & rank_bb((s - up).rank());
+        let phalanx    = neighbours & s.rank_bb();
+        let supported  = neighbours & (s-up).rank_bb();
 
         let backward;
 
@@ -338,7 +351,7 @@ fn evaluate<Us: ColorTrait>(pos: &Position, e: &mut Entry) -> Score {
             backward = false;
         } else {
             // Find the backmost rank with neighbours or stoppers
-            let b = rank_bb(backmost_sq(us, neighbours | stoppers).rank());
+            let b = backmost_sq(us, neighbours | stoppers).rank_bb();
 
             // The pawn is backward if it cannot safely progress to that
             // rank: either there is a stopper in the way on this rank or

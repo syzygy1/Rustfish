@@ -118,7 +118,7 @@ pub fn init()
     opts.push(Opt::new("Move Overhead", OptVal::spin(30, 0, 5000), None));
     opts.push(Opt::new("Minimum Thinking Time", OptVal::spin(20, 0, 5000),
         None));
-    opts.push(Opt::new("Slow Mover", OptVal::spin(89, 10, 1000), None));
+    opts.push(Opt::new("Slow Mover", OptVal::spin(84, 10, 1000), None));
     opts.push(Opt::new("UCI_AnalyseMode", OptVal::check(false), None));
     opts.push(Opt::new("UCI_Chess960", OptVal::check(false), None));
     opts.push(Opt::new("SyzygyPath", OptVal::string("<empty>"),
@@ -134,11 +134,11 @@ pub fn init()
 
 pub fn free()
 {
-    let _opts: Box<Vec<Opt>> = unsafe { Box::from_raw(OPTIONS) };
+    let _opts = unsafe { Box::from_raw(OPTIONS) };
 }
 
 pub fn print() {
-    let opts: Box<Vec<Opt>> = unsafe { Box::from_raw(OPTIONS) };
+    let opts = unsafe { Box::from_raw(OPTIONS) };
     for opt in opts.iter() {
         print!("\noption name {} type {}", opt.key, match opt.val {
             OptVal::StringOpt { def, .. } => format!("string default {}", def),
@@ -155,7 +155,7 @@ pub fn print() {
 }
 
 pub fn set(key: &str, val: &str) {
-    let mut opts: Box<Vec<Opt>> = unsafe { Box::from_raw(OPTIONS) };
+    let mut opts = unsafe { Box::from_raw(OPTIONS) };
     if let Some(opt) = opts.iter_mut().find(|ref o| o.key == key) {
         match opt.val {
             OptVal::StringOpt { ref mut cur, .. } => *cur = String::from(val),
@@ -177,7 +177,7 @@ pub fn set(key: &str, val: &str) {
 }
 
 pub fn get_i32(key: &str) -> i32 {
-    let opts: Box<Vec<Opt>> = unsafe { Box::from_raw(OPTIONS) };
+    let opts = unsafe { Box::from_raw(OPTIONS) };
     let val = {
         let opt = opts.iter().find(|ref o| o.key == key).unwrap();
         if let OptVal::Spin { cur, .. } = opt.val { cur } else { 0 }
@@ -187,7 +187,7 @@ pub fn get_i32(key: &str) -> i32 {
 }
 
 pub fn get_bool(key: &str) -> bool {
-    let opts: Box<Vec<Opt>> = unsafe { Box::from_raw(OPTIONS) };
+    let opts = unsafe { Box::from_raw(OPTIONS) };
     let val = {
         let opt = opts.iter().find(|ref o| o.key == key).unwrap();
         if let OptVal::Check { cur, .. } = opt.val { cur } else { false }
@@ -197,7 +197,7 @@ pub fn get_bool(key: &str) -> bool {
 }
 
 pub fn get_string(key: &str) -> String {
-    let opts: Box<Vec<Opt>> = unsafe { Box::from_raw(OPTIONS) };
+    let opts = unsafe { Box::from_raw(OPTIONS) };
     let val = {
         let opt = opts.iter().find(|ref o| o.key == key).unwrap();
         if let OptVal::StringOpt { ref cur, ..} = opt.val {

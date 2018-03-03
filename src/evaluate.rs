@@ -286,7 +286,7 @@ fn evaluate_pieces<Us: ColorTrait, Pt: PieceTypeTrait> (
             _ => pos.attacks_from(pt, s)
         };
 
-        if pos.pinned_pieces(us) & s != 0 {
+        if pos.blockers_for_king(us) & s != 0 {
             b &= line_bb(pos.square(us, KING), s);
         }
 
@@ -497,13 +497,14 @@ fn evaluate_king<Us: ColorTrait>(pos: &Position, ei: &mut EvalInfo) -> Score {
         // Unsafe or occupied checking squares will also be considered, as
         // long as the square is in the attacker's mobility area.
         unsafe_checks &= ei.mobility_area[them.0 as usize];
+        let pinned = pos.blockers_for_king(us) & pos.pieces_c(us);
 
         king_danger +=
             ei.king_attackers_count[them.0 as usize] *
                 ei.king_attackers_weight[them.0 as usize]
             + 102 * ei.king_adjacent_zone_attacks_count[them.0 as usize]
             + 191 * popcount(ei.king_ring[us.0 as usize] & weak) as i32
-            + 143 * popcount(pos.pinned_pieces(us) | unsafe_checks) as i32
+            + 143 * popcount(pinned | unsafe_checks) as i32
             - 848 * (pos.count(them, QUEEN) == 0) as i32
             -   9 * score.mg().0 / 8
             +  40;
@@ -884,7 +885,7 @@ pub fn evaluate(pos: &Position) -> Value {
     // If we have a specialized evluation function for the current material
     // configuration, call it and return.
     if me.specialized_eval_exists() {
-        return TEMPO + me.evaluate(pos);
+        return me.evaluate(pos);
     }
 
     // Initialize score by reading the incrementally updated scores included
@@ -900,7 +901,7 @@ pub fn evaluate(pos: &Position) -> Value {
     // Early exit if score is high
     let v = (score.mg() + score.eg()) / 2;
     if v.abs() > LAZY_THRESHOLD {
-        return TEMPO + if pos.side_to_move() == WHITE { v } else { -v };
+        return if pos.side_to_move() == WHITE { v } else { -v };
     }
 
     // Main evaluation begins here

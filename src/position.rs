@@ -363,15 +363,6 @@ impl Position {
         self.st().pinners_for_king[c.0 as usize]
     }
 
-    pub fn discovered_check_candidates(&self) -> Bitboard {
-        self.blockers_for_king(!self.side_to_move)
-        & self.pieces_c(self.side_to_move)
-    }
-
-    pub fn pinned_pieces(&self, c: Color) -> Bitboard {
-        self.blockers_for_king(c) & self.pieces_c(c)
-    }
-
     pub fn check_squares(&self, pt: PieceType) -> Bitboard {
         self.st().check_squares[pt.0 as usize]
     }
@@ -803,7 +794,7 @@ impl Position {
     pub fn slider_blockers(
         &self, sliders: Bitboard, s: Square, pinners: &mut Bitboard
     ) -> Bitboard {
-        let mut result = Bitboard(0);
+        let mut blockers = Bitboard(0);
         *pinners = Bitboard(0);
 
         // Snipers are sliders that attack 's' when a piece is removed
@@ -816,13 +807,13 @@ impl Position {
             let b = between_bb(s, sniper_sq) & self.pieces();
 
             if !more_than_one(b) {
-                result |= b;
+                blockers |= b;
                 if b & self.pieces_c(self.piece_on(s).color()) != 0 {
                     *pinners |= sniper_sq;
                 }
             }
         }
-        result
+        blockers
     }
 
     // legal() tests whether a pseudo-legal move is legal
@@ -869,7 +860,7 @@ impl Position {
 
         // A non-king move is legal if and only if it is not pinned or it
         // is moving along the ray towards or away from the king.
-        self.pinned_pieces(us) & from == 0
+        self.blockers_for_king(us) & from == 0
         || aligned(from, m.to(), self.square(us, KING))
     }
 
@@ -972,7 +963,7 @@ impl Position {
         }
 
         // Is there a discovered check?
-        if self.discovered_check_candidates() & from != 0
+        if self.blockers_for_king(!self.side_to_move()) & from != 0
             && !aligned(from, to, self.square(!self.side_to_move(), KING))
         {
             return true;

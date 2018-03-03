@@ -169,9 +169,8 @@ fn futility_margin(d: Depth) -> Value {
     Value(150 * d / ONE_PLY)
 }
 
-fn razor_margin() -> Value {
-    Value(590)
-}
+const RAZOR_MARGIN1: i32 = 590;
+const RAZOR_MARGIN2: i32 = 604;
 
 // Futility and reductions lookup tables, initialized at startup
 static mut FUTILITY_MOVE_COUNTS: [[i32; 16]; 2] = [[0; 16]; 2];
@@ -426,7 +425,7 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
 
         // Age out PV variability metric
         if pos.is_main {
-            pos.best_move_changes *= 0.505;
+            pos.best_move_changes *= 0.517;
             pos.failed_low = false;
         }
 
@@ -589,8 +588,8 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                 // if all of the available time has been used.
                 let f = [ pos.failed_low as i32,
                           (best_value - pos.previous_score).0 ];
-                let improving_factor = std::cmp::max(229,
-                    std::cmp::min(715, 357 + 119 * f[0] - 6 * f[1]));
+                let improving_factor = std::cmp::max(246,
+                    std::cmp::min(832, 306 + 119 * f[0] - 6 * f[1]));
 
                 let mut unstable_pv_factor = 1. + pos.best_move_changes;
 
@@ -601,16 +600,16 @@ pub fn thread_search(pos: &mut Position, _th: &threads::ThreadCtrl) {
                 time_reduction = 1.;
                 for i in 3..6 {
                     if last_best_move_depth * i < pos.completed_depth {
-                        time_reduction *= 1.3;
+                        time_reduction *= 1.25;
                     }
                     unstable_pv_factor *=
-                        pos.previous_time_reduction.powf(0.51) / time_reduction;
+                        pos.previous_time_reduction.powf(0.528) / time_reduction;
 
                     if pos.root_moves.len() == 1
                         || (timeman::elapsed() as f64) >
                             (timeman::optimum() as f64) *
                             unstable_pv_factor *
-                            (improving_factor as f64) / 605.0
+                            (improving_factor as f64) / 581.0
                     {
                         // If we are allowed to ponder do not stop the search
                         // now but keep pondering until the GUI sends
@@ -659,7 +658,6 @@ fn search<NT: NodeType>(
     let mut capture_count = 0;
     let mut quiet_count = 0;
     ss[5].move_count = 0;
-    ss[5].stat_score = 0;
     let mut best_value = -Value::INFINITE;
     let mut max_value = Value::INFINITE;
 
@@ -705,6 +703,7 @@ fn search<NT: NodeType>(
     ss[5].cont_history = pos.cont_history.get(NO_PIECE, Square(0));
     ss[7].killers = [Move::NONE; 2];
     let prev_sq = ss[4].current_move.to();
+    ss[7].stat_score = 0;
 
     // Step 4. Transposition table lookup. We don't want the score of a
     // partial search to overwrite a previous full search TT value, so we use
@@ -751,7 +750,7 @@ fn search<NT: NodeType>(
         return tt_value;
     }
 
-    // Step 4a. Tablebase probe
+    // Step 5. Tablebase probe
     if !root_node && tb::cardinality() != 0 {
         let pieces_cnt = popcount(pos.pieces());
 
@@ -819,7 +818,7 @@ fn search<NT: NodeType>(
         }
     }
 
-    // Step 5. Evaluate the position statically
+    // Step 6. Evaluate the position statically
     loop {
         let eval;
         if in_check {
@@ -856,16 +855,28 @@ fn search<NT: NodeType>(
             break; // goto moves_loop;
         }
 
-        // Step 6. Razoring (skipped when in check)
+        // Step 7. Razoring (skipped when in check)
         if !pv_node
             && depth <= ONE_PLY
-            && eval + razor_margin() <= alpha
         {
-            return qsearch::<NonPv, False>(pos, ss, alpha, alpha+1,
+            if eval + RAZOR_MARGIN1 <= alpha {
+                return qsearch::<NonPv, False>(pos, ss, alpha, alpha+1,
+                        Depth::ZERO);
+            }
+        }
+        else if !pv_node
+            && depth <= 2 * ONE_PLY
+            && eval + RAZOR_MARGIN2 <= alpha
+        {
+            let ralpha = alpha - RAZOR_MARGIN2;
+            let v = qsearch::<NonPv, False>(pos, ss, ralpha, ralpha+1,
                 Depth::ZERO);
+            if v <= ralpha {
+                return v;
+            }
         }
 
-        // Step 7. Futility pruning: child node (skipped when in check)
+        // Step 8. Futility pruning: child node (skipped when in check)
         if !root_node
             && depth < 7 * ONE_PLY
             && eval - futility_margin(depth) >= beta
@@ -874,7 +885,7 @@ fn search<NT: NodeType>(
             return eval;
         }
 
-        // Step 8. Null move search with verification search (ommitted in PV
+        // Step 9. Null move search with verification search (ommitted in PV
         // nodes)
         if !pv_node
             && eval >= beta
@@ -930,7 +941,7 @@ fn search<NT: NodeType>(
             }
         }
 
-        // Step 9. ProbCut (skipped when in check)
+        // Step 10. ProbCut (skipped when in check)
         // If we have a good enough capture and a reduced search returns a
         // value much above beta, we can (almost) safely prune the previous
         // move.
@@ -956,8 +967,21 @@ fn search<NT: NodeType>(
                     debug_assert!(depth >= 5 * ONE_PLY);
                     let gives_check = pos.gives_check(m);
                     pos.do_move(m, gives_check);
-                    let value = -search::<NonPv>(pos, &mut ss[1..], -rbeta,
-                        -rbeta+1, depth - 4 * ONE_PLY, !cut_node, false);
+
+                    // Perform a preliminary search at depth 1 to verify that
+                    // the move holds. Skip if depth is 5 to avoid two searches
+                    // at depth 1 in a row.
+                    let mut value = Value::ZERO; // to prevent warning
+                    if depth != 5 * ONE_PLY {
+                        value = -search::<NonPv>(pos, &mut ss[1..], -rbeta,
+                            -rbeta+1, ONE_PLY, !cut_node, true);
+                    }
+
+                    if depth == 5 * ONE_PLY || value >= rbeta {
+                        value = -search::<NonPv>(pos, &mut ss[1..], -rbeta,
+                            -rbeta+1, depth - 4 * ONE_PLY, !cut_node, false);
+                    }
+
                     pos.undo_move(m);
                     if value >= rbeta {
                         return value;
@@ -966,7 +990,7 @@ fn search<NT: NodeType>(
             }
         }
 
-        // Step 10. Internal iterative deepening (skipped when in check)
+        // Step 11. Internal iterative deepening (skipped when in check)
         if depth >= 6 * ONE_PLY
             && tt_move == Move::NONE
             && (pv_node || ss[5].static_eval + 256 >= beta)
@@ -1006,7 +1030,7 @@ fn search<NT: NodeType>(
     let mut tt_capture = false;
     let pv_exact = pv_node && tt_hit && tte.bound() == Bound::EXACT;
 
-    // Step 11. Loop through moves
+    // Step 12. Loop through moves
     // Loop through all pseudo-legal moves until no moves remain or a beta
     // cutoff occurs
     loop {
@@ -1052,7 +1076,8 @@ fn search<NT: NodeType>(
 
         let gives_check =
             if m.move_type() == NORMAL
-                && pos.discovered_check_candidates() == 0
+                && pos.blockers_for_king(!pos.side_to_move())
+                    & pos.pieces_c(pos.side_to_move()) == 0
             {
                 pos.check_squares(moved_piece.piece_type()) & m.to() != 0
             } else {
@@ -1062,7 +1087,7 @@ fn search<NT: NodeType>(
         let move_count_pruning = depth < 16 *ONE_PLY
             && move_count >= futility_move_counts(improving, depth);
 
-        // Step 12. Singular and Gives Check Extensions
+        // Step 13. Singular and Gives Check Extensions
 
         // Singular extension search. If all moves but one fail low on a search
         // of (alpha-s, beta-s), and just one fails high on (alpha, beta), then
@@ -1094,7 +1119,7 @@ fn search<NT: NodeType>(
         // Calculate new depth for this move
         let new_depth = depth - ONE_PLY + extension;
 
-        // Step 13. Pruning at shallow depth
+        // Step 14. Pruning at shallow depth
         if !root_node
             && pos.non_pawn_material_c(pos.side_to_move()) != Value::ZERO
             && best_value > Value::MATED_IN_MAX_PLY
@@ -1163,10 +1188,10 @@ fn search<NT: NodeType>(
         ss[5].current_move = m;
         ss[5].cont_history = pos.cont_history.get(moved_piece, m.to());
 
-        // Step 14. Make the move
+        // Step 15. Make the move
         pos.do_move(m, gives_check);
 
-        // Step 15. Reduced depth search (LMR). If the move fails high it will
+        // Step 16. Reduced depth search (LMR). If the move fails high it will
         // be re-searched at full depth.
         let do_full_depth_search;
 
@@ -1239,7 +1264,7 @@ fn search<NT: NodeType>(
             do_full_depth_search = !pv_node || move_count > 1;
         }
 
-        // Step 16. Full depth search if LMR is skipped or fails high
+        // Step 17. Full depth search if LMR is skipped or fails high
         if do_full_depth_search {
             value = if new_depth < ONE_PLY {
                 if gives_check {
@@ -1279,12 +1304,12 @@ fn search<NT: NodeType>(
             }
         }
 
-        // Step 17. Undo move
+        // Step 18. Undo move
         pos.undo_move(m);
 
         debug_assert!(value > -Value::INFINITE && value < Value::INFINITE);
 
-        // Step 18. Check for a new best move
+        // Step 19. Check for a new best move
         // Finished searching the move. If a stop occurred, the return value
         // of the search cannot be trusted, and we return immediately without
         // updating best move, PV and TT.
@@ -1525,7 +1550,8 @@ fn qsearch<NT: NodeType, InCheck: Bool> (
 
         let gives_check =
             if m.move_type() == NORMAL
-                && pos.discovered_check_candidates() == 0
+                && pos.blockers_for_king(!pos.side_to_move())
+                    & pos.pieces_c(pos.side_to_move()) == 0
             {
                 pos.check_squares(pos.moved_piece(m).piece_type())
                 & m.to() != 0
