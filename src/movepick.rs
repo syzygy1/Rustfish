@@ -149,8 +149,6 @@ const QSEARCH:            i32 = 14;
 const QCAPTURES_INIT:     i32 = 15;
 const QCAPTURES:          i32 = 16;
 const QCHECKS:            i32 = 17;
-const QSEARCH_RECAPTURES: i32 = 18;
-const QRECAPTURES:        i32 = 19;
 
 // partial_insertion_sort() sorts moves in descending order up to and
 // including a given limit.
@@ -385,35 +383,23 @@ impl MovePicker {
 
 impl MovePickerQ {
     pub fn new(pos: &Position, ttm: Move, d: Depth, s: Square) -> MovePickerQ {
-        let mut stage;
-
-        loop {
-            if pos.checkers() != 0 {
-                stage = EVASION;
-            } else if d > Depth::QS_RECAPTURES {
-                stage = QSEARCH;
-            } else {
-                stage = QSEARCH_RECAPTURES;
-                break;
-            }
-
-            let tt_move =
-                if ttm != Move::NONE && pos.pseudo_legal(ttm) { ttm }
-                else { Move::NONE };
-
-            if tt_move == Move::NONE {
-                stage += 1;
-            }
-
-            break;
-        }
+        let mut stage = if pos.checkers() != 0 { EVASION } else { QSEARCH };
+        let tt_move = if ttm != Move::NONE
+            && pos.pseudo_legal(ttm)
+            && (d > Depth::QS_RECAPTURES || ttm.to() == s)
+        {
+            ttm
+        } else {
+            stage += 1;
+            Move::NONE
+        };
 
         MovePickerQ {
             cur: 0,
             end_moves: 0,
             stage: stage,
             depth: d,
-            tt_move: ttm,
+            tt_move: tt_move,
             recapture_square: s,
             list: [ExtMove {m: Move::NONE, value: 0}; MAX_MOVES as usize],
         }
@@ -455,7 +441,10 @@ impl MovePickerQ {
                 while self.cur < self.end_moves {
                     let m = pick_best(&mut self.list[self.cur..self.end_moves]);
                     self.cur += 1;
-                    if m != self.tt_move {
+                    if m != self.tt_move
+                        && (self.depth > Depth::QS_RECAPTURES
+                            || m.to() == self.recapture_square)
+                    {
                         return m;
                     }
                 }
@@ -473,23 +462,6 @@ impl MovePickerQ {
                     let m = self.list[self.cur].m;
                     self.cur += 1;
                     if m != self.tt_move {
-                        return m;
-                    }
-                }
-                break;
-            }
-
-            QSEARCH_RECAPTURES => {
-                self.cur = 0;
-                self.end_moves = generate::<Captures>(pos, &mut self.list, 0);
-                self.stage += 1;
-            }
-
-            QRECAPTURES => {
-                while self.cur < self.end_moves {
-                    let m = pick_best(&mut self.list[self.cur..self.end_moves]);
-                    self.cur += 1;
-                    if m.to() == self.recapture_square {
                         return m;
                     }
                 }

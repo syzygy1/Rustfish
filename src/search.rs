@@ -955,6 +955,7 @@ fn search<NT: NodeType>(
 
             let mut mp =
                 MovePickerPC::new(pos, tt_move, rbeta - ss[5].static_eval);
+            let mut prob_cut_count = depth / ONE_PLY - 3;
             loop {
                 let m = mp.next_move(pos);
                 if m == Move::NONE {
@@ -985,6 +986,10 @@ fn search<NT: NodeType>(
                     pos.undo_move(m);
                     if value >= rbeta {
                         return value;
+                    }
+                    prob_cut_count -= 1;
+                    if prob_cut_count == 0 {
+                        break;
                     }
                 }
             }

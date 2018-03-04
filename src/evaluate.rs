@@ -728,8 +728,8 @@ fn evaluate_passed_pawns<Us: ColorTrait>(
                 // Otherwise assign a smaller bonus if the block square isn't
                 // attacked.
                 let mut k = if unsafe_squares == 0 { 20 }
-                        else if unsafe_squares & block_sq == 0 { 9 }
-                        else { 0 };
+                    else if unsafe_squares & block_sq == 0 { 9 }
+                    else { 0 };
 
                 // If the path to the queen is fully defended, assign a big
                 // bonus. Otherwise assign a smaller bonus if the block square
@@ -798,9 +798,8 @@ fn evaluate_space<Us: ColorTrait>(pos: &Position, ei: &EvalInfo) -> Score {
     debug_assert!((safe >> (if us == WHITE { 32 } else { 0 })).0 as u32 == 0);
 
     // ...count safe + (behind & safe) with a single popcount.
-    let bonus = popcount(
-            (if us == WHITE { safe << 32 } else { safe >> 32 })
-            | (behind & safe)) as i32;
+    let bonus = popcount((if us == WHITE { safe << 32 } else { safe >> 32 })
+        | (behind & safe)) as i32;
     let weight = pos.count(us, ALL_PIECES) - 2 * ei.pe.open_files();
 
     Score::make(bonus * weight * weight / 16, 0)
@@ -815,13 +814,11 @@ fn evaluate_initiative(pos: &Position, ei: &EvalInfo, eg: Value) -> Score {
             pos.square(BLACK, KING).file()) as i32
         - u32::distance(pos.square(WHITE, KING).rank(),
             pos.square(BLACK, KING).rank()) as i32;
-    let both_flanks =
-        pos.pieces_p(PAWN) & QUEEN_SIDE != 0
+    let both_flanks = pos.pieces_p(PAWN) & QUEEN_SIDE != 0
         && pos.pieces_p(PAWN) & KING_SIDE != 0;
 
     // Compute the initiative bonus for the attacking side
-    let initiative =
-        8 * (ei.pe.pawn_asymmetry() + king_distance - 17)
+    let initiative = 8 * (ei.pe.pawn_asymmetry() + king_distance - 17)
         + 12 * (pos.count(WHITE, PAWN) + pos.count(BLACK, PAWN))
         + 16 * (both_flanks as i32);
 
@@ -852,8 +849,7 @@ fn evaluate_scale_factor(
             if pos.non_pawn_material_c(WHITE) == BishopValueMg
                 && pos.non_pawn_material_c(BLACK) == BishopValueMg
             {
-                return
-                    if more_than_one(pos.pieces_p(PAWN)) { ScaleFactor(31) }
+                return if more_than_one(pos.pieces_p(PAWN)) { ScaleFactor(31) }
                     else { ScaleFactor(9) };
             }
 
