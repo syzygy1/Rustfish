@@ -679,25 +679,30 @@ impl Position {
         }
 
         if self.st_mut().ep_square != Square::NONE {
-            self.st_mut().key ^=
-                zobrist::enpassant(self.st().ep_square.file());
+            let tmp = zobrist::enpassant(self.st().ep_square.file());
+            self.st_mut().key = tmp;
         }
 
         if self.side_to_move == BLACK {
             self.st_mut().key ^= zobrist::side();
         }
 
-        self.st_mut().key ^= zobrist::castling(self.st().castling_rights);
+        {
+            let tmp = zobrist::castling(self.st().castling_rights);
+            self.st_mut().key ^= tmp;
+        }
 
         for s in self.pieces_p(PAWN) {
-            self.st_mut().pawn_key ^= zobrist::psq(self.piece_on(s), s);
+            let tmp = zobrist::psq(self.piece_on(s), s);
+            self.st_mut().pawn_key ^= tmp;
         }
 
         for c in 0..2 {
             for pt in 2..6 {
                 let pc = Piece::make(Color(c), PieceType(pt));
-                self.st_mut().non_pawn_material[c as usize] +=
+                let tmp =
                     self.count(Color(c), PieceType(pt)) * piece_value(MG, pc);
+                self.st_mut().non_pawn_material[c as usize] += tmp;
             }
 
             for pt in 1..7 {
@@ -1101,8 +1106,11 @@ impl Position {
 
             // Update material hash key and prefetch access to material_table
             k ^= zobrist::psq(captured, capsq);
-            self.st_mut().material_key ^= zobrist::material(captured,
-                self.piece_count[captured.0 as usize]);
+            {
+                let tmp = zobrist::material(captured,
+                    self.piece_count[captured.0 as usize]);
+                self.st_mut().material_key ^= tmp;
+            }
             // prefetch
 
             // Update incremental scores
@@ -1159,11 +1167,13 @@ impl Position {
                 // Update hash keys
                 k ^= zobrist::psq(pc, to) ^ zobrist::psq(promotion, to);
                 self.st_mut().pawn_key ^= zobrist::psq(pc, to);
-                self.st_mut().material_key ^=
-                    zobrist::material(promotion,
-                        self.piece_count[promotion.0 as usize] - 1)
-                    ^ zobrist::material(pc,
-                        self.piece_count[pc.0 as usize]);
+                {
+                    let tmp = zobrist::material(promotion,
+                            self.piece_count[promotion.0 as usize] - 1)
+                        ^ zobrist::material(pc,
+                            self.piece_count[pc.0 as usize]);
+                    self.st_mut().material_key ^= tmp;
+                }
 
                 // Update incremental score
                 self.st_mut().psq +=
@@ -1306,7 +1316,8 @@ impl Position {
         self.states.push(st_copy);
 
         if self.st().ep_square != Square::NONE {
-            self.st_mut().key ^= zobrist::enpassant(self.st().ep_square.file());
+            let tmp = zobrist::enpassant(self.st().ep_square.file());
+            self.st_mut().key ^= tmp;
             self.st_mut().ep_square = Square::NONE;
         }
 

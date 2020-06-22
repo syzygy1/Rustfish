@@ -87,9 +87,9 @@ type Threads = Vec<Arc<ThreadCtrl>>;
 static mut HANDLERS: *mut Handlers = 0 as *mut Handlers;
 static mut THREADS: *mut Threads = 0 as *mut Threads;
 
-static STOP: AtomicBool = ATOMIC_BOOL_INIT;
-static PONDER: AtomicBool = ATOMIC_BOOL_INIT;
-static STOP_ON_PONDERHIT: AtomicBool = ATOMIC_BOOL_INIT;
+static STOP: AtomicBool = AtomicBool::new(false);
+static PONDER: AtomicBool = AtomicBool::new(false);
+static STOP_ON_PONDERHIT: AtomicBool = AtomicBool::new(false);
 
 pub fn stop() -> bool {
     STOP.load(Ordering::Relaxed)
@@ -141,7 +141,8 @@ pub fn set(requested: usize) {
     while handlers.len() < requested {
         let idx = handlers.len();
         let (tx, rx) = channel();
-        let builder = thread::Builder::new().stack_size(16 * 1024 * 1024);
+        // 16 MB stacks are now too small in debug mode, so use 32 MB stacks
+        let builder = thread::Builder::new().stack_size(32 * 1024 * 1024);
         let handler = builder.spawn(move || run_thread(idx, tx)).unwrap();
         let th = rx.recv().unwrap();
         handlers.push(handler);

@@ -16,7 +16,7 @@ use std::fs;
 use std::path::Path;
 use std::slice;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, ATOMIC_BOOL_INIT, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 static mut MAX_CARDINALITY: u32 = 0;
 static mut MAX_CARDINALITY_DTM: u32 = 0;
@@ -735,12 +735,12 @@ pub fn init_tb(name: &str) {
             has_dtz: has_dtz,
             wdl: UnsafeCell::new(WdlPiece {
                 mapping: None,
-                ready: ATOMIC_BOOL_INIT,
+                ready: AtomicBool::new(false),
                 ei: [EncInfo::new(), EncInfo::new()],
             }),
             dtm: UnsafeCell::new(DtmPiece {
                 mapping: None,
-                ready: ATOMIC_BOOL_INIT,
+                ready: AtomicBool::new(false),
                 ei: [EncInfo::new(), EncInfo::new()],
                 map: &[],
                 map_idx: [[0; 2]; 2],
@@ -748,7 +748,7 @@ pub fn init_tb(name: &str) {
             }),
             dtz: UnsafeCell::new(DtzPiece {
                 mapping: None,
-                ready: ATOMIC_BOOL_INIT,
+                ready: AtomicBool::new(false),
                 flags: 0,
                 ei: EncInfo::new(),
                 map: &[],
@@ -773,7 +773,7 @@ pub fn init_tb(name: &str) {
             has_dtz: has_dtz,
             wdl: UnsafeCell::new(WdlPawn {
                 mapping: None,
-                ready: ATOMIC_BOOL_INIT,
+                ready: AtomicBool::new(false),
                 ei: [
                     [EncInfo::new(), EncInfo::new()],
                     [EncInfo::new(), EncInfo::new()],
@@ -783,7 +783,7 @@ pub fn init_tb(name: &str) {
             }),
             dtm: UnsafeCell::new(DtmPawn {
                 mapping: None,
-                ready: ATOMIC_BOOL_INIT,
+                ready: AtomicBool::new(false),
                 ei: [
                     [EncInfo::new(), EncInfo::new()],
                     [EncInfo::new(), EncInfo::new()],
@@ -799,7 +799,7 @@ pub fn init_tb(name: &str) {
             }),
             dtz: UnsafeCell::new(DtzPawn {
                 mapping: None,
-                ready: ATOMIC_BOOL_INIT,
+                ready: AtomicBool::new(false),
                 flags: [0; 4],
                 ei: [
                     EncInfo::new(), EncInfo::new(),

@@ -35,8 +35,7 @@ fn position(pos: &mut Position, pos_data: &mut PosData, args: &str) {
     if &args[0..8] == "startpos" {
         fen = START_FEN;
     } else if &args[0..3] == "fen" {
-        fen = &args[3..moves];
-        fen.trim();
+        fen = (&args[3..moves]).trim();
     } else {
         return;
     }
