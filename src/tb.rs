@@ -18,6 +18,8 @@ use std::slice;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+const TB_PIECES: usize = 7;
+
 static mut MAX_CARDINALITY: u32 = 0;
 static mut MAX_CARDINALITY_DTM: u32 = 0;
 static mut CARDINALITY: u32 = 0;
@@ -69,18 +71,18 @@ pub fn probe_depth() -> Depth {
 
 struct EncInfo {
     precomp: Option<Box<PairsData>>,
-    factor: [u32; 6],
-    pieces: [u8; 6],
-    norm: [u8; 6],
+    factor: [usize; TB_PIECES],
+    pieces: [u8; TB_PIECES],
+    norm: [u8; TB_PIECES],
 }
 
 impl EncInfo {
     pub fn new() -> EncInfo {
         EncInfo {
             precomp: None,
-            factor: [0; 6],
-            pieces: [0; 6],
-            norm: [0; 6],
+            factor: [0; TB_PIECES],
+            pieces: [0; TB_PIECES],
+            norm: [0; TB_PIECES],
         }
     }
 }
@@ -939,6 +941,45 @@ pub fn init(path: String) {
             }
         }
 
+        for i in 0..5 {
+            for j in i..5 {
+                for k in j..5 {
+                    for l in 0..5 {
+                        for m in l..5 {
+                            init_tb(&format!("K{}{}{}vK{}{}",
+                                P[i], P[j], P[k], P[l], P[m]));
+                        }
+                    }
+                }
+            }
+        }
+
+        for i in 0..5 {
+            for j in i..5 {
+                for k in j..5 {
+                    for l in k..5 {
+                        for m in 0..5 {
+                            init_tb(&format!("K{}{}{}{}vK{}",
+                                P[i], P[j], P[k], P[l], P[m]));
+                        }
+                    }
+                }
+            }
+        }
+
+        for i in 0..5 {
+            for j in i..5 {
+                for k in j..5 {
+                    for l in k..5 {
+                        for m in l..5 {
+                            init_tb(&format!("K{}{}{}{}{}vK",
+                                P[i], P[j], P[k], P[l], P[m]));
+                        }
+                    }
+                }
+            }
+        }
+
     }
 
     println!("info string Found {} WDL, {} DTM and {} DTZ tablebase files.",
@@ -946,7 +987,7 @@ pub fn init(path: String) {
 }
 
 // place k like pieces on n squares
-fn subfactor(k: u32, n: u32) -> u32 {
+fn subfactor(k: usize, n: usize) -> usize {
     let mut f = n;
     let mut l = 1;
     for i in 1..k {
@@ -969,19 +1010,19 @@ fn calc_factors<T: Encoding>(
     let mut k = 0;
     while i < e.num() || k == order || k == order2 {
         if k == order {
-            ei.factor[0] = f as u32;
+            ei.factor[0] = f;
             f *= if T::ENC == PieceEnc::ENC {
                 if e.kk_enc() { 462 } else { 31332 }
             } else {
                 pfactor::<T>(ei.norm[0] as usize - 1, t)
             };
         } else if k == order2 {
-            ei.factor[ei.norm[0] as usize] = f as u32;
-            f *= subfactor(ei.norm[ei.norm[0] as usize] as u32,
-                48 - ei.norm[0] as u32) as usize;
+            ei.factor[ei.norm[0] as usize] = f;
+            f *= subfactor(ei.norm[ei.norm[0] as usize] as usize,
+                48 - ei.norm[0] as usize);
         } else {
-            ei.factor[i as usize] = f as u32;
-            f *= subfactor(ei.norm[i as usize] as u32, n as u32) as usize;
+            ei.factor[i as usize] = f;
+            f *= subfactor(ei.norm[i as usize] as usize, n as usize);
             n -= ei.norm[i as usize];
             i += ei.norm[i as usize];
         }
@@ -1310,7 +1351,8 @@ fn init_table<T: TbTable>(e: &T::Entry, name: &str) -> bool {
 }
 
 fn fill_squares(
-    pos: &Position, pc: &[u8; 6], num: usize, flip: bool, p: &mut [Square; 6]
+    pos: &Position, pc: &[u8; TB_PIECES], num: usize, flip: bool,
+    p: &mut [Square; TB_PIECES]
 ) {
     let mut i = 0;
     loop {
@@ -1361,7 +1403,7 @@ fn probe_helper<T: TbTable> (
         leading_pawn_table::<T::Enc>(b, flip) as usize
     } else { 0 };
 
-    let mut p: [Square; 6] = [Square(0); 6];
+    let mut p: [Square; TB_PIECES] = [Square(0); TB_PIECES];
     fill_squares(pos, &tb.ei(t, bside).pieces, e.num() as usize, flip,
             &mut p);
     if T::Enc::ENC != PieceEnc::ENC && flip {
@@ -2257,11 +2299,11 @@ const KK_IDX: [[u16; 64]; 10] = [
         0,   0,   0,   0,   0,   0,   0, 461 ],
 ];
 
-static mut BINOMIAL: [[u32; 64]; 6] = [[0; 64]; 6];
-static mut PAWN_IDX: [[u32; 24]; 5] = [[0; 24]; 5];
-static mut PFACTOR: [[u32; 4]; 5] = [[0; 4]; 5];
-static mut PAWN_IDX2: [[u32; 24]; 5] = [[0; 24]; 5];
-static mut PFACTOR2: [[u32; 6]; 5] = [[0; 6]; 5];
+static mut BINOMIAL: [[usize; 64]; 7] = [[0; 64]; 7];
+static mut PAWN_IDX: [[usize; 24]; 6] = [[0; 24]; 6];
+static mut PFACTOR: [[usize; 4]; 6] = [[0; 4]; 6];
+static mut PAWN_IDX2: [[usize; 24]; 6] = [[0; 24]; 6];
+static mut PFACTOR2: [[usize; 6]; 6] = [[0; 6]; 6];
 
 fn off_diag(s: Square) -> i8 {
     OFF_DIAG[s.0 as usize]
@@ -2312,59 +2354,59 @@ fn kk_idx(s1: usize, s2: Square) -> usize {
 }
 
 fn binomial(n: usize, k: usize) -> usize {
-    unsafe { BINOMIAL[k as usize][n] as usize }
+    unsafe { BINOMIAL[k as usize][n] }
 }
 
 fn pawn_idx<T: Encoding>(num: usize, s: usize) -> usize {
     if T::ENC == FileEnc::ENC {
-        unsafe { PAWN_IDX[num][s] as usize }
+        unsafe { PAWN_IDX[num][s] }
     } else {
-        unsafe { PAWN_IDX2[num][s] as usize }
+        unsafe { PAWN_IDX2[num][s] }
     }
 }
 
 fn pfactor<T: Encoding>(num: usize, s: usize) -> usize {
     if T::ENC == FileEnc::ENC {
-        unsafe { PFACTOR[num][s] as usize }
+        unsafe { PFACTOR[num][s] }
     } else {
-        unsafe { PFACTOR2[num][s] as usize }
+        unsafe { PFACTOR2[num][s] }
     }
 }
 
 fn init_indices() {
-    for i in 0..6 {
+    for i in 0..7 {
         for j in 0..64 {
-            let mut f = 1i32;
-            let mut l = 1i32;
+            let mut f = 1;
+            let mut l = 1;
             for k in 0..i {
-                f *= (j as i32) - (k as i32);
-                l *= (k as i32) + 1;
+                f *= usize::wrapping_sub(j, k);
+                l *= k + 1;
             }
-            unsafe { BINOMIAL[i][j] = (f / l) as u32; }
+            unsafe { BINOMIAL[i][j] = f / l; }
         }
     }
 
-    for i in 0..5 {
+    for i in 0..6 {
         let mut s = 0;
         for j in 0..24 {
-            unsafe { PAWN_IDX[i][j] = s as u32; }
+            unsafe { PAWN_IDX[i][j] = s; }
             let k = (1 + (j % 6)) * 8 + (j / 6);
             s += binomial(ptwist::<FileEnc>(Square(k as u32)), i);
             if (j + 1) % 6 == 0 {
-                unsafe { PFACTOR[i][j / 6] = s as u32; }
+                unsafe { PFACTOR[i][j / 6] = s; }
                 s = 0;
             }
         }
     }
 
-    for i in 0..5 {
+    for i in 0..6 {
         let mut s = 0;
         for j in 0..24 {
-            unsafe { PAWN_IDX2[i][j] = s as u32; }
+            unsafe { PAWN_IDX2[i][j] = s; }
             let k = (1 + (j / 4)) * 8 + (j % 4);
             s += binomial(ptwist::<RankEnc>(Square(k as u32)), i);
             if (j + 1) % 4 == 0 {
-                unsafe { PFACTOR2[i][j / 4] = s as u32; }
+                unsafe { PFACTOR2[i][j / 4] = s; }
                 s = 0;
             }
         }
@@ -2385,12 +2427,22 @@ fn leading_pawn_table<T: Encoding>(pawns: Bitboard, flip: bool) -> u32 {
 }
 
 fn encode<T: Encoding>(
-    p: &mut [Square; 6], ei: &EncInfo, entry: &T::Entry
+    p: &mut [Square; TB_PIECES], ei: &EncInfo, entry: &T::Entry
 ) -> usize {
     let n = entry.num() as usize;
 
-    // normalize
-    if p[0].0 & 4 != 0 {
+    if T::ENC != PieceEnc::ENC {
+        for i in 0..entry.pawns(0) {
+            for j in i+1..entry.pawns(0) {
+                if ptwist::<T>(p[i as usize]) < ptwist::<T>(p[j as usize])
+                {
+                    p.swap(i as usize, j as usize);
+                }
+            }
+        }
+    }
+
+    if p[0].0 & 0x04 != 0 {
         for i in 0..n {
             p[i] = Square(p[i].0 ^ 0x07);
         }
@@ -2439,23 +2491,14 @@ fn encode<T: Encoding>(
                 + (diag(p[1]) - s1) * 6 + (diag(p[2]) - s2)
             }
         };
-        idx *= ei.factor[0] as usize;
+        idx *= ei.factor[0];
     } else {
-        for i in 0..entry.pawns(0) {
-            for j in i+1..entry.pawns(0) {
-                if ptwist::<T>(p[i as usize]) < ptwist::<T>(p[j as usize])
-                {
-                    p.swap(i as usize, j as usize);
-                }
-            }
-        }
-
         let t = entry.pawns(0) as usize;
         idx = pawn_idx::<T>(t - 1, flap::<T>(p[0])) as usize;
         for i in 1..t {
             idx += binomial(ptwist::<T>(p[i]), t - i);
         }
-        idx *= ei.factor[0] as usize;
+        idx *= ei.factor[0];
 
         // remaining pawns
         i = entry.pawns(0) as usize;
@@ -2477,7 +2520,7 @@ fn encode<T: Encoding>(
                 }
                 s += binomial(sq.0 as usize - skips - 8, m - i + 1);
             }
-            idx += s * ei.factor[i] as usize;
+            idx += s * ei.factor[i];
             i = t;
         }
     }
@@ -2500,7 +2543,7 @@ fn encode<T: Encoding>(
             }
             s += binomial(sq.0 as usize - skips, m - i + 1);
         }
-        idx += s * ei.factor[i] as usize;
+        idx += s * ei.factor[i];
         i += t;
     }
 
