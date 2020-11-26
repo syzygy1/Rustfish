@@ -215,15 +215,17 @@ const ROOK_INIT: [MagicInit; 64] = [
 // Compute the attack's index using the 'magic bitboards' approach
 fn index_bishop(s: Square, occupied: Bitboard) -> usize {
     unsafe {
-        u64::wrapping_mul((occupied & BISHOP_MAGICS.masks[s.0 as usize]).0,
-            BISHOP_MAGICS.magics[s.0 as usize]) as usize >> (64-9)
+        (u64::wrapping_mul((occupied & BISHOP_MAGICS.masks[s.0 as usize]).0,
+            BISHOP_MAGICS.magics[s.0 as usize]
+        ) >> (64-9)) as usize 
     }
 }
 
 fn index_rook(s: Square, occupied: Bitboard) -> usize {
     unsafe {
-        u64::wrapping_mul((occupied & ROOK_MAGICS.masks[s.0 as usize]).0,
-            ROOK_MAGICS.magics[s.0 as usize]) as usize >> (64-12)
+        (u64::wrapping_mul((occupied & ROOK_MAGICS.masks[s.0 as usize]).0,
+            ROOK_MAGICS.magics[s.0 as usize]
+        ) >> (64-12)) as usize
     }
 }
 
