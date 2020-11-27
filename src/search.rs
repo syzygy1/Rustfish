@@ -310,7 +310,7 @@ pub fn mainthread_search(pos: &mut Position, th: &threads::ThreadCtrl) {
         && limits().depth == 0
         && pos.root_moves[0].pv[0] != Move::NONE
     {
-        let mut common = th.common.lock().unwrap();
+        let common = th.common.lock().unwrap();
         let result = &mut common.result.lock().unwrap();
         if result.score > pos.root_moves[0].score
             && (result.depth >= pos.completed_depth

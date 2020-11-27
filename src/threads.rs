@@ -222,7 +222,7 @@ fn run_thread(idx: usize, tx: Sender<Arc<ThreadCtrl>>) {
             mainthread_search(&mut pos, &th);
         } else {
             thread_search(&mut pos, &th);
-            let mut lock = th.common.lock().unwrap();
+            let lock = th.common.lock().unwrap();
             let result = &mut lock.result.lock().unwrap();
             if pos.root_moves[0].score > result.score
                 && (pos.completed_depth >= result.depth
